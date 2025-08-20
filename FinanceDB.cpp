@@ -1,3 +1,4 @@
+#include "helper.h"
 #include "FinanceDB.h"
 #include<vector>
 #include<queue>
@@ -209,6 +210,50 @@ void FinanceDB::updatePriority(const std::string& spentOn) {
 /***************************************************/
 /********** NEW FUNCTIONS FOR VIEWING DATA *********/
 /***************************************************/
+
+std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std::string end_date){
+    std::vector<ExpenseRecord>summaries; 
+    
+    std::string sql="SELECT day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, start_date.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, end_date.c_str(), -1, SQLITE_STATIC);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ExpenseRecord e;
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.price = sqlite3_column_double(stmt, 2);
+            e.priority = sqlite3_column_int(stmt, 3);
+            summaries.push_back(e);
+        }
+    } else {
+        std::cerr << "Failed to prepare statement for getRangeOfDate: " << sqlite3_errmsg(detailedDB) << std::endl;
+    }
+    sqlite3_finalize(stmt);
+    return summaries;
+}
+
+std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){
+    std::vector<ExpenseRecord>summaries; 
+    std::string ordering=(order)?"ASC":"DESC";
+    std::string sql="SELECT day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ExpenseRecord e;
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.price = sqlite3_column_double(stmt, 2);
+            e.priority = sqlite3_column_int(stmt, 3);
+            summaries.push_back(e);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return summaries;
+}
 
 std::vector<MonthlySummary> FinanceDB::getAllSummaries() {
     std::vector<MonthlySummary> summaries;

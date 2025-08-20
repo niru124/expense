@@ -44,7 +44,7 @@ public:
   // --- Methods for Adding Data ---
   bool addOrUpdateMonthlySummary(double salary, double limit);
   bool addExpense(const std::string &spentOn, double price);
-  void updatePriority(const std::string& spentOn);
+  void updatePriority(const std::string &spentOn);
 
   // --- New Methods for Viewing Data ---
   std::vector<MonthlySummary> getAllSummaries();
@@ -54,6 +54,9 @@ public:
 
   std::vector<ExpenseRecord> getSortedByVal();
   std::vector<ExpenseRecord> calcPriority();
+  std::vector<ExpenseRecord> calcSortByPrice(bool order);
+  std::vector<ExpenseRecord> getRangeOfDate(std::string start_date,
+                                            std::string end_date);
 };
 
 #endif // FINANCEDB_H
