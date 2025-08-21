@@ -57,6 +57,7 @@ public:
   std::vector<ExpenseRecord> calcSortByPrice(bool order);
   std::vector<ExpenseRecord> getRangeOfDate(std::string start_date,
                                             std::string end_date);
+  double calcTotalSpent();
 };
 
 #endif // FINANCEDB_H

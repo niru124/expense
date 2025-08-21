@@ -355,3 +355,19 @@ MonthlySummary FinanceDB::getCurrentMonthSummary() {
     sqlite3_finalize(stmt);
     return summary;
 }
+
+double FinanceDB::calcTotalSpent() {
+    double total=0.0;
+    std::string sql = "SELECT SUM(Price) FROM "+currentTableName+";";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            total=sqlite3_column_double(stmt,0);
+        }
+    } else {
+        std::cerr << "Failed to prepare statement for calcTotalSpent: " << sqlite3_errmsg(detailedDB) << std::endl;
+    }
+    sqlite3_finalize(stmt);
+    return total;
+}

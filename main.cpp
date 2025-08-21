@@ -170,6 +170,13 @@ int main() {
         return crow::response(response);
       });
 
+  CROW_ROUTE(app, "/total_spent").methods(crow::HTTPMethod::Get)([&db_ptr]() {
+    double totalSpentAmount = db_ptr->calcTotalSpent();
+    crow::json::wvalue response;
+    response["total"] = totalSpentAmount;
+    return crow::response(response);
+  });
+
   std::cout << "Starting server on port 5000..." << std::endl;
   app.port(5000).multithreaded().run();
 
