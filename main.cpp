@@ -52,6 +52,10 @@ int main() {
         double salary = data["salary"].d();
         double limit = data["limit"].d();
 
+        if (!isNumber(salary) || !isNumber(limit)) {
+          return crow::response(400, "Bad Request: 'salary' and 'limit' must be numbers.");
+        }
+
         if (db_ptr->addOrUpdateMonthlySummary(salary, limit)) {
           return crow::response(200, "Monthly summary updated.");
         }
@@ -66,8 +70,12 @@ int main() {
                                 "Bad Request: Missing 'spentOn' or 'price'.");
         }
 
-        std::string spentOn = data["spentOn"].s();
+        std::string spentOn = refinedString(data["spentOn"].s());
         double price = data["price"].d();
+
+        if (!isNumber(price)) {
+          return crow::response(400, "Bad Request: 'price' must be a number.");
+        }
         // Priority is handled internally by addExpense and updatePriority
 
         if (!db_ptr->addExpense(spentOn, price)) {
@@ -175,6 +183,17 @@ int main() {
     crow::json::wvalue response;
     response["total"] = totalSpentAmount;
     return crow::response(response);
+  });
+
+  CROW_ROUTE(app, "/delete_expense/<int>").methods(crow::HTTPMethod::Delete)([&db_ptr](int id) {
+    if (!isNumber(id)) {
+      return crow::response(400, "Bad Request: ID must be a number.");
+    }
+    if (db_ptr->deleteSelected(id)) {
+      return crow::response(200, "Expense with ID " + std::to_string(id) + " deleted successfully.");
+    } else {
+      return crow::response(500, "Failed to delete expense with ID " + std::to_string(id) + ".");
+    }
   });
 
   std::cout << "Starting server on port 5000..." << std::endl;

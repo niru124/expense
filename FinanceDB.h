@@ -58,6 +58,7 @@ public:
   std::vector<ExpenseRecord> getRangeOfDate(std::string start_date,
                                             std::string end_date);
   double calcTotalSpent();
+  bool deleteSelected(int id);
 };
 
 #endif // FINANCEDB_H

@@ -371,3 +371,27 @@ double FinanceDB::calcTotalSpent() {
     sqlite3_finalize(stmt);
     return total;
 }
+
+bool FinanceDB::deleteSelected(int id) {
+    if (!detailedDB) return false;
+
+    std::string sql = "DELETE FROM " + currentTableName + " WHERE rowid = ?;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+        std::cerr << "Failed to prepare statement for deleteSelected: " << sqlite3_errmsg(detailedDB) << std::endl;
+        return false;
+    }
+
+    sqlite3_bind_int(stmt, 1, id);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        std::cerr << "Execution failed for deleteSelected: " << sqlite3_errmsg(detailedDB) << std::endl;
+        sqlite3_finalize(stmt);
+        return false;
+    }
+
+    sqlite3_finalize(stmt);
+    return true;
+}
+
