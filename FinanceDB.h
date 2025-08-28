@@ -59,6 +59,7 @@ public:
                                             std::string end_date);
   double calcTotalSpent();
   bool deleteSelected(int id);
+  bool updateSelected(std::string str);
 };
 
 #endif // FINANCEDB_H

@@ -16,6 +16,10 @@ Before compiling, ensure you have the necessary development libraries installed 
     sudo apt-get update
     sudo apt-get install libsqlite3-dev
     ```
+    On Arch-based systems, install with:
+    ```bash
+    sudo pacman -S sqlite
+    ```
     For other Linux distributions, please refer to your package manager's documentation for installing SQLite3 development headers.
 
 *   **Crow C++ Web Framework:** Crow is primarily header-only, but its dependencies (like Boost) might need to be installed. Ensure you have Crow properly set up or included in your project.
@@ -25,6 +29,10 @@ Before compiling, ensure you have the necessary development libraries installed 
     ```bash
     sudo apt-get install libboost-system-dev libboost-thread-dev
     ```
+    On Arch-based systems, install with:
+    ```bash
+    sudo pacman -S boost
+    ```
 
 ### Compilation and Execution
 
@@ -33,12 +41,16 @@ Before compiling, ensure you have the necessary development libraries installed 
     ```bash
     chmod +x run.sh
     ```
-3.  Run the application using the provided script:
+3.  Compile the project:
     ```bash
-    ./run.sh
+    cmake . && make
+    ```
+4.  Run the application:
+    ```bash
+    make run
     ```
 
-    This script will compile the `main.cpp`, `FinanceDB.cpp`, and `helper.cpp` files, link the necessary libraries, and then execute the compiled application. The application will start a web server, typically on `http://localhost:5000`.
+    This will compile the `main.cpp`, `FinanceDB.cpp`, and `helper.cpp` files, link the necessary libraries, and then execute the compiled application. The application will start a web server, typically on `http://localhost:5000`.
 
 ## API Endpoints
 
@@ -155,4 +167,24 @@ The application exposes the following API endpoints:
             "priority": 2
         }
     ]
+    ```
+
+### 9. Get Total Spent
+*   **URL:** `/total_spent`
+*   **Method:** `GET`
+*   **Description:** Retrieves the total amount spent for the current month.
+*   **Response:** JSON object with the total amount.
+    ```json
+    {
+        "total": 1500.50
+    }
+    ```
+
+### 10. Delete Expense by ID
+*   **URL:** `/delete_expense/<id>` (e.g., `/delete_expense/123`)
+*   **Method:** `DELETE`
+*   **Description:** Deletes an expense record by its unique ID.
+*   **Response:** Success or error message.
+    ```json
+    "Expense with ID 123 deleted successfully."
     ```

@@ -2,3 +2,10 @@ temp.cpp
 Detailed.db
 Main.db
 finance_api
+expense
+CMakeFiles/
+Makefile
+cmake_install.cmake
+CMakeCache.txt
+*.o
+expense.dSYM/

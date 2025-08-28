@@ -395,3 +395,60 @@ bool FinanceDB::deleteSelected(int id) {
     return true;
 }
 
+bool FinanceDB::updateSelected(std::string str){
+    std::stringstream ss(str);
+    std::string temp;
+    int id;
+    std::string SpentOn;
+    double Price;
+    int Priority;
+
+    // Extract id
+    if (!std::getline(ss, temp, '_')) {
+        std::cerr << "Error parsing id from string: " << str << std::endl;
+        return false;
+    }
+    id = std::stoi(temp);
+
+    // Extract SpentOn
+    if (!std::getline(ss, SpentOn, '_')) {
+        std::cerr << "Error parsing SpentOn from string: " << str << std::endl;
+        return false;
+    }
+
+    // Extract Price
+    if (!std::getline(ss, temp, '_')) {
+        std::cerr << "Error parsing Price from string: " << str << std::endl;
+        return false;
+    }
+    Price = std::stod(temp);
+
+    // Extract Priority
+    if (!std::getline(ss, temp, '_')) {
+        std::cerr << "Error parsing Priority from string: " << str << std::endl;
+        return false;
+    }
+    Priority = std::stoi(temp);
+
+    std::string sql="UPDATE "+currentTableName+" SET SpentOn = ?, Price = ?, Priority = ? WHERE rowid = ?;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+        std::cerr << "Failed to prepare statement for updateSelected: " << sqlite3_errmsg(detailedDB) << std::endl;
+        return false;
+    }
+
+    sqlite3_bind_text(stmt, 1, SpentOn.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_double(stmt, 2, Price);
+    sqlite3_bind_int(stmt, 3, Priority);
+    sqlite3_bind_int(stmt, 4, id);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        std::cerr << "Execution failed for updateSelected: " << sqlite3_errmsg(detailedDB) << std::endl;
+        sqlite3_finalize(stmt);
+        return false;
+    }
+
+    sqlite3_finalize(stmt);
+    return true;
+}

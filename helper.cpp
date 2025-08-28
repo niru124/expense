@@ -48,6 +48,4 @@ std::string refinedString(const std::string &str) {
   return res;
 }
 
-template <typename T> bool isNumber(const T &a) {
-  return std::is_arithmetic<T>::value;
-}
+

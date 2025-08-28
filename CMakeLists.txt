@@ -28,7 +28,7 @@ add_executable(expense main.cpp FinanceDB.cpp helper.cpp)
 
 # Link libraries
 target_link_libraries(expense
-    SQLite3::SQLite3
+    sqlite3
     Boost::system
     Boost::thread
     pthread
@@ -39,3 +39,6 @@ target_include_directories(expense PRIVATE ${CROW_INCLUDE_DIR})
 
 # If Crow requires specific compiler definitions (e.g., for CROW_ENABLE_COMPRESSION)
 # target_compile_definitions(expense PRIVATE CROW_ENABLE_COMPRESSION)
+
+# Add a custom target to run the executable
+add_custom_target(run COMMAND $<TARGET_FILE:expense> WORKING_DIRECTORY ${CMAKE_BINARY_DIR} DEPENDS expense)
