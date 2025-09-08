@@ -1,6 +1,7 @@
 #ifndef FINANCEDB_H
 #define FINANCEDB_H
 
+#include <optional>
 #include <sqlite3.h>
 #include <string>
 #include <vector>
@@ -59,7 +60,13 @@ public:
                                             std::string end_date);
   double calcTotalSpent();
   bool deleteSelected(int id);
-  bool updateSelected(std::string str);
+  bool updateSelected(int id, const std::optional<std::string> &spentOn,
+                      const std::optional<double> &price,
+                      const std::optional<int> &priority);
+
+  bool updateSelected2(int id, const std::optional<std::string> &spentOn,
+                       const std::optional<double> &price,
+                       const std::optional<int> &priority);
 };
 
 #endif // FINANCEDB_H

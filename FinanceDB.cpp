@@ -1,3 +1,4 @@
+#include<optional>
 #include "helper.h"
 #include "FinanceDB.h"
 #include<vector>
@@ -8,6 +9,7 @@
 #include <sstream>
 #include <numeric>
 #include <ctime>
+#include <functional>
 
 // --- All the code from the previous FinanceDB.cpp goes here ---
 // --- (Constructors, destructors, addExpense, etc.)     ---
@@ -395,56 +397,121 @@ bool FinanceDB::deleteSelected(int id) {
     return true;
 }
 
-bool FinanceDB::updateSelected(std::string str){
-    std::stringstream ss(str);
-    std::string temp;
-    int id;
-    std::string SpentOn;
-    double Price;
-    int Priority;
+bool FinanceDB::updateSelected(int id, const std::optional<std::string>& spentOn, const std::optional<double>& price, const std::optional<int>& priority) {
+    if (!detailedDB) return false;
 
-    // Extract id
-    if (!std::getline(ss, temp, '_')) {
-        std::cerr << "Error parsing id from string: " << str << std::endl;
+    bool anyUpdated = false;
+
+    if (spentOn) {
+        std::string sql = "UPDATE " + currentTableName + " SET SpentOn = ? WHERE rowid = ?;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+            std::cerr << "Failed to prepare statement for SpentOn update: " << sqlite3_errmsg(detailedDB) << std::endl;
+            return false;
+        }
+        sqlite3_bind_text(stmt, 1, spentOn->c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 2, id);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Execution failed for SpentOn update: " << sqlite3_errmsg(detailedDB) << std::endl;
+            sqlite3_finalize(stmt);
+            return false;
+        }
+        sqlite3_finalize(stmt);
+        anyUpdated = true;
+    }
+
+    if (price) {
+        std::string sql = "UPDATE " + currentTableName + " SET Price = ? WHERE rowid = ?;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+            std::cerr << "Failed to prepare statement for Price update: " << sqlite3_errmsg(detailedDB) << std::endl;
+            return false;
+        }
+        sqlite3_bind_double(stmt, 1, *price);
+        sqlite3_bind_int(stmt, 2, id);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Execution failed for Price update: " << sqlite3_errmsg(detailedDB) << std::endl;
+            sqlite3_finalize(stmt);
+            return false;
+        }
+        sqlite3_finalize(stmt);
+        anyUpdated = true;
+    }
+
+    if (priority) {
+        std::string sql = "UPDATE " + currentTableName + " SET Priority = ? WHERE rowid = ?;";
+        sqlite3_stmt* stmt = nullptr;
+        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+            std::cerr << "Failed to prepare statement for Priority update: " << sqlite3_errmsg(detailedDB) << std::endl;
+            return false;
+        }
+        sqlite3_bind_int(stmt, 1, *priority);
+        sqlite3_bind_int(stmt, 2, id);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            std::cerr << "Execution failed for Priority update: " << sqlite3_errmsg(detailedDB) << std::endl;
+            sqlite3_finalize(stmt);
+            return false;
+        }
+        sqlite3_finalize(stmt);
+        anyUpdated = true;
+    }
+
+    if (!anyUpdated) {
+        std::cerr << "No fields were updated for id: " << id << std::endl;
+    }
+
+    return anyUpdated;
+}
+
+bool FinanceDB::updateSelected2(int id, const std::optional<std::string>& spentOn, const std::optional<double>& price, const std::optional<int>& priority) {
+    if (!detailedDB) return false;
+
+    std::vector<std::string> update_clauses;
+    std::vector<std::function<void(sqlite3_stmt*, int)>> binders;
+
+    if (spentOn) {
+        update_clauses.push_back("SpentOn = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_text(stmt, idx, spentOn->c_str(), -1, SQLITE_STATIC); });
+    }
+    if (price) {
+        update_clauses.push_back("Price = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_double(stmt, idx, *price); });
+    }
+    if (priority) {
+        update_clauses.push_back("Priority = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_int(stmt, idx, *priority); });
+    }
+
+    if (update_clauses.empty()) {
+        std::cerr << "No fields provided for update for id: " << id << std::endl;
         return false;
     }
-    id = std::stoi(temp);
 
-    // Extract SpentOn
-    if (!std::getline(ss, SpentOn, '_')) {
-        std::cerr << "Error parsing SpentOn from string: " << str << std::endl;
-        return false;
+    std::string set_clause;
+    for (size_t i = 0; i < update_clauses.size(); ++i) {
+        set_clause += update_clauses[i];
+        if (i < update_clauses.size() - 1) {
+            set_clause += ", ";
+        }
     }
 
-    // Extract Price
-    if (!std::getline(ss, temp, '_')) {
-        std::cerr << "Error parsing Price from string: " << str << std::endl;
-        return false;
-    }
-    Price = std::stod(temp);
-
-    // Extract Priority
-    if (!std::getline(ss, temp, '_')) {
-        std::cerr << "Error parsing Priority from string: " << str << std::endl;
-        return false;
-    }
-    Priority = std::stoi(temp);
-
-    std::string sql="UPDATE "+currentTableName+" SET SpentOn = ?, Price = ?, Priority = ? WHERE rowid = ?;";
-    sqlite3_stmt* stmt;
+    std::string sql = "UPDATE " + currentTableName + " SET " + set_clause + " WHERE rowid = ?;";
+    sqlite3_stmt* stmt = nullptr;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
-        std::cerr << "Failed to prepare statement for updateSelected: " << sqlite3_errmsg(detailedDB) << std::endl;
+        std::cerr << "Failed to prepare statement for updateSelected2: " << sqlite3_errmsg(detailedDB) << std::endl;
         return false;
     }
 
-    sqlite3_bind_text(stmt, 1, SpentOn.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_double(stmt, 2, Price);
-    sqlite3_bind_int(stmt, 3, Priority);
-    sqlite3_bind_int(stmt, 4, id);
+    int param_index = 1;
+    for (const auto& binder : binders) {
+        binder(stmt, param_index++);
+    }
+
+    sqlite3_bind_int(stmt, param_index, id);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
-        std::cerr << "Execution failed for updateSelected: " << sqlite3_errmsg(detailedDB) << std::endl;
+        std::cerr << "Execution failed for updateSelected2: " << sqlite3_errmsg(detailedDB) << std::endl;
         sqlite3_finalize(stmt);
         return false;
     }

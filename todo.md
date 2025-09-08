@@ -6,4 +6,4 @@ Here are some suggested new endpoints:
 - [x] `/expenses/range/<start_date>/<end_date>` (GET): List expenses within a date range. (Needs getExpensesForDateRange())
 - [x] `/total_spent` (GET): Total spent for current month. (Needs getTotalSpentForCurrentMonth())
 - [x] `/delete_expense/<string>` (DELETE): Delete expense by ID. (Needs deleteExpense())
-- [ ] `/edit_expense/<string>` (PUT): Edit expense by ID. (Needs editExpense())
+- [x] `/edit_expense/<string>` (PUT): Edit expense by ID. (Needs editExpense())

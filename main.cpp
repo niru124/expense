@@ -196,6 +196,45 @@ int main() {
     }
   });
 
+  CROW_ROUTE(app, "/edit_expense/<int>")
+      .methods(crow::HTTPMethod::Put)([&db_ptr](const crow::request &req, int id) {
+        auto data = crow::json::load(req.body);
+        if (!data) {
+          return crow::response(400, "Bad Request: Invalid JSON.");
+        }
+
+        std::optional<std::string> spentOn;
+        if (data.has("spentOn")) {
+          spentOn = refinedString(data["spentOn"].s());
+        }
+
+        std::optional<double> price;
+        if (data.has("price")) {
+          if (!isNumber(data["price"].d())) {
+            return crow::response(400, "Bad Request: 'price' must be a number.");
+          }
+          price = data["price"].d();
+        }
+
+        std::optional<int> priority;
+        if (data.has("priority")) {
+          if (!isNumber(data["priority"].i())) {
+            return crow::response(400, "Bad Request: 'priority' must be an integer.");
+          }
+          priority = data["priority"].i();
+        }
+
+        if (!spentOn && !price && !priority) {
+          return crow::response(400, "Bad Request: No fields provided for update.");
+        }
+
+        if (db_ptr->updateSelected2(id, spentOn, price, priority)) {
+          return crow::response(200, "Expense with ID " + std::to_string(id) + " updated successfully.");
+        } else {
+          return crow::response(500, "Failed to update expense with ID " + std::to_string(id) + ".");
+        }
+      });
+
   std::cout << "Starting server on port 5000..." << std::endl;
   app.port(5000).multithreaded().run();
 

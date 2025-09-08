@@ -47,5 +47,3 @@ std::string refinedString(const std::string &str) {
   res[0] = toupper(res[0]);
   return res;
 }
-
-
