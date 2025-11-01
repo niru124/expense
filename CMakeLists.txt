@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(SQLite3 REQUIRED)
 
 # Find Boost libraries
-find_package(Boost 1.65.1 COMPONENTS system thread REQUIRED)
+
 
 # Find Crow (assuming it's installed or available in a standard include path)
 # Crow is mostly header-only, so we primarily need its include directory.
@@ -29,8 +29,6 @@ add_executable(expense main.cpp FinanceDB.cpp helper.cpp)
 # Link libraries
 target_link_libraries(expense
     sqlite3
-    Boost::system
-    Boost::thread
     pthread
 )
 

@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 p-6">
+    <div class="container mx-auto bg-white p-8 rounded-lg shadow-md">
+        <h1 class="text-3xl font-bold mb-6 text-center">Expense Tracker</h1>
+
+        <!-- Add Expense Form -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Add New Expense</h2>
+            <form id="addExpenseForm" class="space-y-4">
+                <div>
+                    <label for="description" class="block text-sm font-medium text-gray-700">Description</label>
+                    <input type="text" id="description" name="description" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="amount" class="block text-sm font-medium text-gray-700">Amount</label>
+                    <input type="number" id="amount" name="amount" step="0.01" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Add Expense</button>
+            </form>
+        </div>
+
+        <!-- Expense List for Current Month -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Your Expenses (Current Month)</h2>
+            <div id="expensesList" class="space-y-4">
+                <p class="text-gray-500 text-center">Loading expenses...</p>
+            </div>
+        </div>
+
+        <!-- Monthly Summary Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Monthly Summary</h2>
+            <form id="updateSummaryForm" class="space-y-4 mb-4">
+                <div>
+                    <label for="summarySalary" class="block text-sm font-medium text-gray-700">Salary</label>
+                    <input type="number" id="summarySalary" name="salary" step="0.01" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
+                </div>
+                <div>
+                    <label for="summaryLimit" class="block text-sm font-medium text-gray-700">Limit Amount</label>
+                    <input type="number" id="summaryLimit" name="limit" step="0.01" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
+                </div>
+                <button type="submit" class="w-full bg-green-600 text-white p-2 rounded-md hover:bg-green-700">Update Monthly Summary</button>
+            </form>
+            <button id="fetchAllSummariesBtn" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 mb-4">Fetch All Monthly Summaries</button>
+            <div id="monthlySummariesOutput" class="space-y-2 text-sm text-gray-800"></div>
+        </div>
+
+        <!-- Highest Prioritized Expenses Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Highest Prioritized Expenses</h2>
+            <button id="fetchHighestPriorityBtn" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 mb-4">Fetch Highest Priority</button>
+            <div id="highestPriorityOutput" class="space-y-2 text-sm text-gray-800"></div>
+        </div>
+
+        <!-- Expenses by Date Range Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Expenses by Date Range</h2>
+            <form id="fetchRangeForm" class="space-y-4 mb-4">
+                <div>
+                    <label for="startDate" class="block text-sm font-medium text-gray-700">Start Date (DD-MM-YYYY)</label>
+                    <input type="text" id="startDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 01-10-2025" required>
+                </div>
+                <div>
+                    <label for="endDate" class="block text-sm font-medium text-gray-700">End Date (DD-MM-YYYY)</label>
+                    <input type="text" id="endDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 31-10-2025" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Fetch Expenses by Range</button>
+            </form>
+            <div id="rangeExpensesOutput" class="space-y-2 text-sm text-gray-800"></div>
+        </div>
+
+        <!-- Expenses Sorted by Price Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Expenses Sorted by Price</h2>
+            <form id="sortPriceForm" class="space-y-4 mb-4">
+                <div>
+                    <label for="sortOrder" class="block text-sm font-medium text-gray-700">Sort Order</label>
+                    <select id="sortOrder" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                        <option value="true">Ascending</option>
+                        <option value="false">Descending</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Fetch Sorted Expenses</button>
+            </form>
+            <div id="sortedExpensesOutput" class="space-y-2 text-sm text-gray-800"></div>
+        </div>
+
+        <!-- Total Spent Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Total Spent (Current Month)</h2>
+            <button id="fetchTotalSpentBtn" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 mb-4">Fetch Total Spent</button>
+            <div id="totalSpentOutput" class="text-lg font-bold text-gray-800"></div>
+        </div>
+
+        <!-- Delete Expense Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Delete Expense</h2>
+            <form id="deleteExpenseForm" class="space-y-4">
+                <div>
+                    <label for="deleteId" class="block text-sm font-medium text-gray-700">Expense ID</label>
+                    <input type="number" id="deleteId" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
+                </div>
+                <button type="submit" class="w-full bg-red-600 text-white p-2 rounded-md hover:bg-red-700">Delete Expense</button>
+            </form>
+            <div id="deleteExpenseOutput" class="mt-4 text-sm text-gray-800"></div>
+        </div>
+
+        <!-- Edit Expense Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Edit Expense</h2>
+            <form id="editExpenseForm" class="space-y-4">
+                <div>
+                    <label for="editId" class="block text-sm font-medium text-gray-700">Expense ID</label>
+                    <input type="number" id="editId" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
+                </div>
+                <div>
+                    <label for="editSpentOn" class="block text-sm font-medium text-gray-700">New Description (Optional)</label>
+                    <input type="text" id="editSpentOn" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="editPrice" class="block text-sm font-medium text-gray-700">New Price (Optional)</label>
+                    <input type="number" id="editPrice" step="0.01" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <div>
+                    <label for="editPriority" class="block text-sm font-medium text-gray-700">New Priority (Optional)</label>
+                    <input type="number" id="editPriority" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
+                </div>
+                <button type="submit" class="w-full bg-yellow-600 text-white p-2 rounded-md hover:bg-yellow-700">Update Expense</button>
+            </form>
+            <div id="editExpenseOutput" class="mt-4 text-sm text-gray-800"></div>
+        </div>
+
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000'; // C++ backend runs on port 5000
+
+        function getCurrentMonthYear() {
+            const date = new Date();
+            const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
+            const year = date.getFullYear();
+            return `${month}_${year}`;
+        }
+
+        // Helper to format date for backend (DD-MM-YYYY)
+        function formatDateForBackend(dateString) {
+            const parts = dateString.split('-');
+            if (parts.length === 3) {
+                return `${parts[0]}-${parts[1]}-${parts[2]}`; // Already in DD-MM-YYYY
+            }
+            return ''; // Invalid format
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchExpenses(); // Initial load of current month's expenses
+
+            // Add Expense Form
+            document.getElementById('addExpenseForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const description = document.getElementById('description').value;
+                const amount = parseFloat(document.getElementById('amount').value);
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/expense`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ spentOn: description, price: amount }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.text();
+                    console.log('Expense added:', result);
+                    document.getElementById('description').value = '';
+                    document.getElementById('amount').value = '';
+                    fetchExpenses(); // Refresh the list
+                } catch (error) {
+                    console.error('Error adding expense:', error);
+                    alert('Failed to add expense. Check console for details.');
+                }
+            });
+
+            // Update Monthly Summary Form
+            document.getElementById('updateSummaryForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const salary = parseFloat(document.getElementById('summarySalary').value);
+                const limit = parseFloat(document.getElementById('summaryLimit').value);
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/summary`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ salary, limit }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.text();
+                    document.getElementById('monthlySummariesOutput').innerHTML = `<p class="text-green-600">${result}</p>`;
+                    console.log('Monthly summary updated:', result);
+                    fetchAllMonthlySummaries(); // Refresh all summaries
+                } catch (error) {
+                    console.error('Error updating monthly summary:', error);
+                    document.getElementById('monthlySummariesOutput').innerHTML = `<p class="text-red-600">Failed to update summary. Check console.</p>`;
+                }
+            });
+
+            // Fetch All Monthly Summaries Button
+            document.getElementById('fetchAllSummariesBtn').addEventListener('click', fetchAllMonthlySummaries);
+
+            // Fetch Highest Priority Button
+            document.getElementById('fetchHighestPriorityBtn').addEventListener('click', fetchHighestPriorityExpenses);
+
+            // Fetch Expenses by Date Range Form
+            document.getElementById('fetchRangeForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const startDate = document.getElementById('startDate').value;
+                const endDate = document.getElementById('endDate').value;
+
+                const formattedStartDate = formatDateForBackend(startDate);
+                const formattedEndDate = formatDateForBackend(endDate);
+
+                if (!formattedStartDate || !formattedEndDate) {
+                    document.getElementById('rangeExpensesOutput').innerHTML = `<p class="text-red-600">Invalid date format. Use DD-MM-YYYY.</p>`;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/range/${formattedStartDate}/${formattedEndDate}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const expenses = await response.json();
+                    displayExpenses(expenses, 'rangeExpensesOutput', 'No expenses found for this range.');
+                } catch (error) {
+                    console.error('Error fetching expenses by range:', error);
+                    document.getElementById('rangeExpensesOutput').innerHTML = `<p class="text-red-600">Failed to load expenses for range. Check console.</p>`;
+                }
+            });
+
+            // Fetch Expenses Sorted by Price Form
+            document.getElementById('sortPriceForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const sortOrder = document.getElementById('sortOrder').value; // 'true' for ASC, 'false' for DESC
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/sorted_by_price/${sortOrder}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const expenses = await response.json();
+                    displayExpenses(expenses, 'sortedExpensesOutput', 'No expenses found.');
+                } catch (error) {
+                    console.error('Error fetching sorted expenses:', error);
+                    document.getElementById('sortedExpensesOutput').innerHTML = `<p class="text-red-600">Failed to load sorted expenses. Check console.</p>`;
+                }
+            });
+
+            // Fetch Total Spent Button
+            document.getElementById('fetchTotalSpentBtn').addEventListener('click', fetchTotalSpent);
+
+            // Delete Expense Form
+            document.getElementById('deleteExpenseForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const id = parseInt(document.getElementById('deleteId').value);
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/delete_expense/${id}`, {
+                        method: 'DELETE',
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.text();
+                    document.getElementById('deleteExpenseOutput').innerHTML = `<p class="text-green-600">${result}</p>`;
+                    console.log('Expense deleted:', result);
+                    fetchExpenses(); // Refresh current month's expenses
+                } catch (error) {
+                    console.error('Error deleting expense:', error);
+                    document.getElementById('deleteExpenseOutput').innerHTML = `<p class="text-red-600">Failed to delete expense. Check console.</p>`;
+                }
+            });
+
+            // Edit Expense Form
+            document.getElementById('editExpenseForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const id = parseInt(document.getElementById('editId').value);
+                const spentOn = document.getElementById('editSpentOn').value;
+                const price = document.getElementById('editPrice').value;
+                const priority = document.getElementById('editPriority').value;
+
+                const updateData = {};
+                if (spentOn) updateData.spentOn = spentOn;
+                if (price) updateData.price = parseFloat(price);
+                if (priority) updateData.priority = parseInt(priority);
+
+                if (Object.keys(updateData).length === 0) {
+                    document.getElementById('editExpenseOutput').innerHTML = `<p class="text-red-600">No fields provided for update.</p>`;
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/edit_expense/${id}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(updateData),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const result = await response.text();
+                    document.getElementById('editExpenseOutput').innerHTML = `<p class="text-green-600">${result}</p>`;
+                    console.log('Expense updated:', result);
+                    fetchExpenses(); // Refresh current month's expenses
+                } catch (error) {
+                    console.error('Error updating expense:', error);
+                    document.getElementById('editExpenseOutput').innerHTML = `<p class="text-red-600">Failed to update expense. Check console.</p>`;
+                }
+            });
+        });
+
+        // --- API Call Functions ---
+
+        async function fetchExpenses() {
+            const expensesList = document.getElementById('expensesList');
+            expensesList.innerHTML = '<p class="text-gray-500 text-center">Loading expenses...</p>';
+
+            const currentMonthYear = getCurrentMonthYear();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/expenses/${currentMonthYear}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const expenses = await response.json();
+                displayExpenses(expenses, 'expensesList', 'No expenses recorded yet for this month.');
+            } catch (error) {
+                console.error('Error fetching expenses:', error);
+                expensesList.innerHTML = '<p class="text-red-500 text-center">Failed to load expenses. Please ensure the C++ backend is running on port 5000 and accessible.</p>';
+            }
+        }
+
+        async function fetchAllMonthlySummaries() {
+            const outputDiv = document.getElementById('monthlySummariesOutput');
+            outputDiv.innerHTML = '<p class="text-gray-500">Loading summaries...</p>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/summary`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const summaries = await response.json();
+                if (summaries.length === 0) {
+                    outputDiv.innerHTML = '<p class="text-gray-500">No monthly summaries found.</p>';
+                    return;
+                }
+                outputDiv.innerHTML = summaries.map(s => `
+                    <div class="bg-gray-100 p-3 rounded-md shadow-sm">
+                        <p><strong>Month/Year:</strong> ${s.month_year}</p>
+                        <p><strong>Salary:</strong> $${s.salary.toFixed(2)}</p>
+                        <p><strong>Limit:</strong> $${s.limit.toFixed(2)}</p>
+                        <p><strong>Saving %:</strong> ${s.saving_percentage.toFixed(2)}%</p>
+                        <p><strong>Condition:</strong> ${s.condition}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching all monthly summaries:', error);
+                outputDiv.innerHTML = '<p class="text-red-600">Failed to load summaries. Check console.</p>';
+            }
+        }
+
+        async function fetchHighestPriorityExpenses() {
+            const outputDiv = document.getElementById('highestPriorityOutput');
+            outputDiv.innerHTML = '<p class="text-gray-500">Loading highest priority expenses...</p>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/highest`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const expenses = await response.json();
+                if (expenses.length === 0) {
+                    outputDiv.innerHTML = '<p class="text-gray-500">No prioritized expenses found.</p>';
+                    return;
+                }
+                outputDiv.innerHTML = expenses.map(e => `
+                    <div class="bg-gray-100 p-3 rounded-md shadow-sm">
+                        <p><strong>Spent On:</strong> ${e.spent_on}</p>
+                        <p><strong>Average Price:</strong> $${e.average_price.toFixed(2)}</p>
+                        <p><strong>Times Purchased:</strong> ${e.times_purchased}</p>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error fetching highest priority expenses:', error);
+                outputDiv.innerHTML = '<p class="text-red-600">Failed to load highest priority expenses. Check console.</p>';
+            }
+        }
+
+        async function fetchTotalSpent() {
+            const outputDiv = document.getElementById('totalSpentOutput');
+            outputDiv.innerHTML = '<p class="text-gray-500">Calculating total spent...</p>';
+            try {
+                const response = await fetch(`${API_BASE_URL}/total_spent`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                outputDiv.innerHTML = `<p class="text-2xl font-bold text-indigo-700">Total Spent: $${data.total.toFixed(2)}</p>`;
+            } catch (error) {
+                console.error('Error fetching total spent:', error);
+                outputDiv.innerHTML = '<p class="text-red-600">Failed to calculate total spent. Check console.</p>';
+            }
+        }
+
+        // Generic function to display expense lists
+        function displayExpenses(expenses, elementId, emptyMessage) {
+            const outputDiv = document.getElementById(elementId);
+            if (expenses.length === 0) {
+                outputDiv.innerHTML = `<p class="text-gray-500 text-center">${emptyMessage}</p>`;
+                return;
+            }
+            outputDiv.innerHTML = ''; // Clear previous content
+            expenses.forEach(expense => {
+                const expenseItem = document.createElement('div');
+                expenseItem.className = 'flex justify-between items-center bg-gray-50 p-4 rounded-md shadow-sm';
+                // Check if 'id' exists, as some endpoints (like /highest) don't return it directly
+                const idDisplay = expense.id ? ` (ID: ${expense.id})` : '';
+                expenseItem.innerHTML = `
+                    <span class="text-lg font-medium">${expense.spent_on}${idDisplay}</span>
+                    <span class="text-lg font-bold text-green-600">$${expense.price.toFixed(2)}</span>
+                `;
+                outputDiv.appendChild(expenseItem);
+            });
+        }
+    </script>
+</body>
+</html>

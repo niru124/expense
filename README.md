@@ -1,60 +1,57 @@
-# Finance CLI Application
+# Finance Tracker Application
 
-This is a C++ command-line interface (CLI) application for managing personal finance, built with the Crow C++ web framework for API exposure and SQLite3 for data storage.
+This project consists of a C++ backend for managing personal finance data (using Crow C++ web framework and SQLite3) and a simple HTML/Tailwind CSS/JavaScript frontend for interaction.
 
-## How to Run
+## Project Structure
 
-To compile and run this application, follow these steps:
+*   `./`: Contains the C++ backend source files (`main.cpp`, `FinanceDB.h`, `FinanceDB.cpp`, `helper.h`, `helper.cpp`), CMake build files, and the `run.sh` script.
+*   `./frontend/`: Contains the static HTML frontend (`index.html`) with Tailwind CSS via CDN and JavaScript for API calls.
+*   `backend_server.py`: A Python Flask server that serves the `frontend/index.html` and acts as a simple static file server for the frontend.
+
+## How to Run the Application
+
+To get the entire application (C++ backend and HTML frontend) up and running, follow these steps:
 
 ### Prerequisites
 
-Before compiling, ensure you have the necessary development libraries installed on your system:
+Before compiling and running, ensure you have the necessary tools and libraries installed on your system:
 
+*   **CMake:** For building the C++ backend.
+    On Arch Linux, install with: `sudo pacman -S cmake`
+*   **g++ (C++ Compiler):** A C++17 compatible compiler.
 *   **SQLite3 Development Libraries:**
-    On Debian/Ubuntu-based systems, install with:
-    ```bash
-    sudo apt-get update
-    sudo apt-get install libsqlite3-dev
-    ```
-    On Arch-based systems, install with:
-    ```bash
-    sudo pacman -S sqlite
-    ```
-    For other Linux distributions, please refer to your package manager's documentation for installing SQLite3 development headers.
+    On Debian/Ubuntu-based systems: `sudo apt-get update && sudo apt-get install libsqlite3-dev`
+    On Arch Linux: `sudo pacman -S sqlite`
+*   **Crow C++ Web Framework:** Crow is primarily header-only. Ensure its dependencies are met. (The `CMakeLists.txt` handles finding it).
+*   **Python 3 and Flask:** For the frontend server.
+    Install Flask: `pip install Flask`
 
-*   **Crow C++ Web Framework:** Crow is primarily header-only, but its dependencies (like Boost) might need to be installed. Ensure you have Crow properly set up or included in your project.
+### Running the Application
 
-*   **Boost Libraries (System and Thread):**
-    On Debian/Ubuntu-based systems, install with:
-    ```bash
-    sudo apt-get install libboost-system-dev libboost-thread-dev
-    ```
-    On Arch-based systems, install with:
-    ```bash
-    sudo pacman -S boost
-    ```
+1.  **Navigate to the project root directory** in your terminal.
 
-### Compilation and Execution
-
-1.  Navigate to the project root directory in your terminal.
-2.  Make the `run.sh` script executable:
+2.  **Make the `run.sh` script executable** (if you haven't already):
     ```bash
     chmod +x run.sh
     ```
-3.  Compile the project:
+
+3.  **Execute the `run.sh` script:**
     ```bash
-    cmake . && make
+    ./run.sh
     ```
-4.  Run the application:
-    ```bash
-    make run
-    ```
+    This script will:
+    *   Build the C++ backend using CMake.
+    *   Start the C++ backend server (on `http://localhost:5000`) in the background.
+    *   Start the Python frontend server (on `http://localhost:8000`) in the background.
+    *   Provide instructions on how to access the frontend.
 
-    This will compile the `main.cpp`, `FinanceDB.cpp`, and `helper.cpp` files, link the necessary libraries, and then execute the compiled application. The application will start a web server, typically on `http://localhost:5000`.
+4.  **Access the Frontend:** Open your web browser and navigate to `http://localhost:8000`.
 
-## API Endpoints
+    *To stop both servers, simply press `Ctrl+C` in the terminal where `run.sh` is running.*
 
-The application exposes the following API endpoints:
+## C++ Backend API Endpoints
+
+The C++ backend (running on `http://localhost:5000`) exposes the following API endpoints:
 
 ### 1. Home Route
 *   **URL:** `/`
@@ -70,7 +67,7 @@ The application exposes the following API endpoints:
     ```json
     [
         {
-            "month_year": "08_2025",
+            "month_year": "11_2025",
             "salary": 5000.0,
             "limit": 4000.0,
             "saving_percentage": 20.0,
@@ -80,14 +77,15 @@ The application exposes the following API endpoints:
     ```
 
 ### 3. Get Expenses for a Specific Month
-*   **URL:** `/expenses/<month_year>` (e.g., `/expenses/08_2025`)
+*   **URL:** `/expenses/<month_year>` (e.g., `/expenses/11_2025`)
 *   **Method:** `GET`
 *   **Description:** Retrieves a list of detailed expense records for a specified month and year.
-*   **Response:** JSON array of expense record objects.
+*   **Response:** JSON array of expense record objects, now including `id` (SQLite `rowid`).
     ```json
     [
         {
-            "day_month_year": "2025-08-15_12345",
+            "id": 1,
+            "day_month_year": "01_11_2025_12345",
             "spent_on": "Groceries",
             "price": 150.75,
             "priority": 5
@@ -106,7 +104,7 @@ The application exposes the following API endpoints:
         "limit": 4000.0
     }
     ```
-*   **Response:** Success or error message.
+*   **Response:** Success or error message (text).
 
 ### 5. Add New Expense
 *   **URL:** `/expense`
@@ -119,7 +117,7 @@ The application exposes the following API endpoints:
         "price": 75.50
     }
     ```
-*   **Response:** Success or error message.
+*   **Response:** Success or error message (text).
 
 ### 6. Get Prioritized Expenses (Highest Frequency/Average Price)
 *   **URL:** `/highest`
@@ -140,12 +138,13 @@ The application exposes the following API endpoints:
 *   **URL:** `/sorted_by_price/<order>` (e.g., `/sorted_by_price/true` for ascending, `/sorted_by_price/false` for descending)
 *   **URL:** `/sorted_by_price/` (defaults to ascending)
 *   **Method:** `GET`
-*   **Description:** Retrieves all expense records for the current month, sorted by price in either ascending or descending order.
+*   **Description:** Retrieves all expense records for the current month, sorted by price in either ascending or descending order. Now includes `id` (SQLite `rowid`).
 *   **Response:** JSON array of expense record objects.
     ```json
     [
         {
-            "day_month_year": "2025-08-10_98765",
+            "id": 2,
+            "day_month_year": "01_11_2025_98765",
             "spent_on": "Bus Fare",
             "price": 2.50,
             "priority": 3
@@ -154,14 +153,15 @@ The application exposes the following API endpoints:
     ```
 
 ### 8. Get Expenses within a Date Range
-*   **URL:** `/range/<start_date>/<end_date>` (e.g., `/range/01-08-2025/15-08-2025`)
+*   **URL:** `/range/<start_date>/<end_date>` (e.g., `/range/01-11-2025/15-11-2025`)
 *   **Method:** `GET`
-*   **Description:** Retrieves expense records within a specified date range (inclusive). Dates should be in `DD-MM-YYYY` format.
+*   **Description:** Retrieves expense records within a specified date range (inclusive). Dates should be in `DD-MM-YYYY` format. Now includes `id` (SQLite `rowid`).
 *   **Response:** JSON array of expense record objects.
     ```json
     [
         {
-            "day_month_year": "2025-08-05_54321",
+            "id": 3,
+            "day_month_year": "05_11_2025_54321",
             "spent_on": "Lunch",
             "price": 12.00,
             "priority": 2
@@ -183,8 +183,25 @@ The application exposes the following API endpoints:
 ### 10. Delete Expense by ID
 *   **URL:** `/delete_expense/<id>` (e.g., `/delete_expense/123`)
 *   **Method:** `DELETE`
-*   **Description:** Deletes an expense record by its unique ID.
-*   **Response:** Success or error message.
+*   **Description:** Deletes an expense record by its unique ID (SQLite `rowid`).
+*   **Response:** Success or error message (text).
+    ```
+    Expense with ID 123 deleted successfully.
+    ```
+
+### 11. Edit Expense by ID
+*   **URL:** `/edit_expense/<id>` (e.g., `/edit_expense/123`)
+*   **Method:** `PUT`
+*   **Description:** Updates an existing expense record by its unique ID (SQLite `rowid`). Accepts optional `spentOn`, `price`, and `priority` fields.
+*   **Request Body:** JSON object (at least one field required).
     ```json
-    "Expense with ID 123 deleted successfully."
+    {
+        "spentOn": "New Description",
+        "price": 25.00,
+        "priority": 4
+    }
+    ```
+*   **Response:** Success or error message (text).
+    ```
+    Expense with ID 123 updated successfully.
     ```

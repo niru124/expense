@@ -17,6 +17,7 @@ struct MonthlySummary {
 
 // Struct to hold a record from a detailed expense table
 struct ExpenseRecord {
+  int id; // Corresponds to SQLite rowid
   std::string day_month_year;
   std::string spent_on;
   double price;

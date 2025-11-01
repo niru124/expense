@@ -1,11 +1,40 @@
-temp.cpp
-Detailed.db
-Main.db
-finance_api
-expense
-CMakeFiles/
-Makefile
-cmake_install.cmake
-CMakeCache.txt
+# C++ and CMake
+build/
 *.o
-expense.dSYM/
+*.d
+*.so
+*.a
+*.lo
+*.la
+*.dylib
+*.mod
+*.smod
+*.cmake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+
+# Databases
+*.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# Frontend (if any build artifacts were generated, though this is a static HTML setup)
+node_modules/
+dist/
+
+# Editor/IDE specific
+.vscode/
+.idea/
+*.swp
+*~
+
+# OS generated files
+.DS_Store
+thumbs.db

@@ -216,7 +216,7 @@ void FinanceDB::updatePriority(const std::string& spentOn) {
 std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std::string end_date){
     std::vector<ExpenseRecord>summaries; 
     
-    std::string sql="SELECT day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -224,10 +224,11 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
         sqlite3_bind_text(stmt, 2, end_date.c_str(), -1, SQLITE_STATIC);
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ExpenseRecord e;
-            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            e.price = sqlite3_column_double(stmt, 2);
-            e.priority = sqlite3_column_int(stmt, 3);
+            e.id = sqlite3_column_int(stmt, 0);
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            e.price = sqlite3_column_double(stmt, 3);
+            e.priority = sqlite3_column_int(stmt, 4);
             summaries.push_back(e);
         }
     } else {
@@ -240,16 +241,17 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
 std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){
     std::vector<ExpenseRecord>summaries; 
     std::string ordering=(order)?"ASC":"DESC";
-    std::string sql="SELECT day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ExpenseRecord e;
-            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            e.price = sqlite3_column_double(stmt, 2);
-            e.priority = sqlite3_column_int(stmt, 3);
+            e.id = sqlite3_column_int(stmt, 0);
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            e.price = sqlite3_column_double(stmt, 3);
+            e.priority = sqlite3_column_int(stmt, 4);
             summaries.push_back(e);
         }
     }
@@ -279,16 +281,17 @@ std::vector<MonthlySummary> FinanceDB::getAllSummaries() {
 
 std::vector<ExpenseRecord> FinanceDB::getSortedByVal() {
     std::vector<ExpenseRecord> summaries;
-    std::string sql = "SELECT day_month_year, SpentOn, Price, Priority FROM " + currentTableName + " ORDER BY Price DESC;";
+    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Priority FROM " + currentTableName + " ORDER BY Price DESC;";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ExpenseRecord e;
-            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            e.price = sqlite3_column_double(stmt, 2);
-            e.priority = sqlite3_column_int(stmt, 3);
+            e.id = sqlite3_column_int(stmt, 0);
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            e.price = sqlite3_column_double(stmt, 3);
+            e.priority = sqlite3_column_int(stmt, 4);
             summaries.push_back(e);
         }
     }
@@ -322,17 +325,18 @@ std::vector<ExpenseRecord> FinanceDB::calcPriority() {
 std::vector<ExpenseRecord> FinanceDB::getExpensesForMonth(const std::string& monthYear) {
     std::vector<ExpenseRecord> expenses;
     std::string tableName = "expenses_" + monthYear;
-    std::string sql = "SELECT day_month_year, SpentOn, Price, Priority FROM " + tableName + ";";
+    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Priority FROM " + tableName + ";";
     sqlite3_stmt* stmt;
 
     // Check if the table exists by preparing the statement. If it fails, return empty.
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ExpenseRecord e;
-            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-            e.price = sqlite3_column_double(stmt, 2);
-            e.priority = sqlite3_column_int(stmt, 3);
+            e.id = sqlite3_column_int(stmt, 0);
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            e.price = sqlite3_column_double(stmt, 3);
+            e.priority = sqlite3_column_int(stmt, 4);
             expenses.push_back(e);
         }
     } else {

@@ -1,12 +1,13 @@
 #include "FinanceDB.h"
 #include "crow.h"
 #include "helper.h" // Include helper.h
+#include "crow/middlewares/cors.h"
 #include <memory>
 
 int main() {
   auto db_ptr = std::make_shared<FinanceDB>("Main.db", "Detailed.db");
 
-  crow::SimpleApp app;
+  crow::App<crow::CORSHandler> app;
 
   CROW_ROUTE(app, "/")([]() {
     return "<p>........working......</p>"
@@ -33,6 +34,7 @@ int main() {
         auto expenses = db_ptr->getExpensesForMonth(month_year);
         crow::json::wvalue response;
         for (size_t i = 0; i < expenses.size(); ++i) {
+          response[i]["id"] = expenses[i].id;
           response[i]["day_month_year"] = expenses[i].day_month_year;
           response[i]["spent_on"] = expenses[i].spent_on;
           response[i]["price"] = expenses[i].price;
@@ -132,6 +134,7 @@ int main() {
             db_ptr->getRangeOfDate(formatted_start_date, formatted_end_date);
         crow::json::wvalue response;
         for (size_t i = 0; i < rangedExpenses.size(); ++i) {
+          response[i]["id"] = rangedExpenses[i].id;
           response[i]["day_month_year"] = rangedExpenses[i].day_month_year;
           response[i]["spent_on"] = rangedExpenses[i].spent_on;
           response[i]["price"] = rangedExpenses[i].price;
@@ -156,6 +159,7 @@ int main() {
         auto sortedExpenses = db_ptr->calcSortByPrice(increasing);
         crow::json::wvalue response;
         for (size_t i = 0; i < sortedExpenses.size(); ++i) {
+          response[i]["id"] = sortedExpenses[i].id;
           response[i]["day_month_year"] = sortedExpenses[i].day_month_year;
           response[i]["spent_on"] = sortedExpenses[i].spent_on;
           response[i]["price"] = sortedExpenses[i].price;
@@ -170,6 +174,7 @@ int main() {
         auto sortedExpenses = db_ptr->calcSortByPrice(true);
         crow::json::wvalue response;
         for (size_t i = 0; i < sortedExpenses.size(); ++i) {
+          response[i]["id"] = sortedExpenses[i].id;
           response[i]["day_month_year"] = sortedExpenses[i].day_month_year;
           response[i]["spent_on"] = sortedExpenses[i].spent_on;
           response[i]["price"] = sortedExpenses[i].price;
@@ -236,7 +241,8 @@ int main() {
       });
 
   std::cout << "Starting server on port 5000..." << std::endl;
-  app.port(5000).multithreaded().run();
+
+  app.port(5000).run();
 
   return 0;
 }
