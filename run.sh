@@ -1,9 +1,15 @@
 #!/bin/bash
 
+# Check if gnuplot is installed (required for sciplot graphs)
+if ! command -v gnuplot &>/dev/null; then
+    echo "Installing gnuplot (required for yearly expense graphs)..."
+    sudo apt-get update && sudo apt-get install -y gnuplot-x11
+fi
+
 # Function to clean up background processes on exit
 cleanup() {
     echo "Stopping background processes..."
-    kill $(jobs -p)
+    kill $(jobs -p) 2>/dev/null
 }
 
 trap cleanup EXIT

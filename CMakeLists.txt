@@ -35,6 +35,9 @@ target_link_libraries(expense
 # Add include directories for Crow
 target_include_directories(expense PRIVATE ${CROW_INCLUDE_DIR})
 
+# Add include directory for sciplot
+target_include_directories(expense PRIVATE ${CMAKE_SOURCE_DIR}/sciplot)
+
 # If Crow requires specific compiler definitions (e.g., for CROW_ENABLE_COMPRESSION)
 # target_compile_definitions(expense PRIVATE CROW_ENABLE_COMPRESSION)
 

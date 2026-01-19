@@ -11,12 +11,7 @@
 #include <ctime>
 #include <functional>
 
-// --- All the code from the previous FinanceDB.cpp goes here ---
-// --- (Constructors, destructors, addExpense, etc.)     ---
-// --- I am omitting it for brevity, but you should keep it. ---
-// --- Just add the new function implementations below.      ---
-
-// Helper function to get current month and year string
+// Helper function to get current month and year string MM_YYYY
 std::string getCurrentYearMonth() {
     auto now = std::chrono::system_clock::now();
     std::time_t now_time = std::chrono::system_clock::to_time_t(now);
@@ -70,7 +65,7 @@ FinanceDB::~FinanceDB() {
 
 void FinanceDB::executeSQL(sqlite3* db, const std::string& sql) {
     char* errMsg = nullptr;
-    if (sqlite3_exec(db, sql.c_str(), 0, 0, &errMsg) != SQLITE_OK) {
+    if (sqlite3_exec(db, sql.c_str(), 0, 0, &errMsg) != SQLITE_OK) { // 0 for unsucess
         std::cerr << "SQL error: " << errMsg << std::endl;
         sqlite3_free(errMsg);
     }
@@ -81,7 +76,7 @@ void FinanceDB::initMainDB() {
                       "month_year TEXT PRIMARY KEY,"
                       "Salary REAL NOT NULL,"
                       "LimitAmount REAL NOT NULL,"
-                      "SavingPercentage REAL,"
+                      "SavingPercentage REAL," //double
                       "Condition TEXT);";
     executeSQL(mainDB, sql);
 }
@@ -99,7 +94,7 @@ double FinanceDB::calculateCurrentSavings(double salary) {
     std::string sql = "SELECT Price FROM " + currentTableName + ";";
     sqlite3_stmt* stmt;
     double totalSpent = 0.0;
-
+    // This code prepares and executes a SQL SELECT query on detailedDB. If preparation succeeds (SQLITE_OK), it steps through each result row, adding the value from the first column (as a double) to totalSpent. After processing all rows, it finalizes the statement to free resources. It's summing numerical values
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             totalSpent += sqlite3_column_double(stmt, 0);
@@ -136,7 +131,7 @@ bool FinanceDB::addOrUpdateMonthlySummary(double salary, double limit) {
         std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(mainDB) << std::endl;
         return false;
     }
-
+    // The 1 is the parameter index, -1 indicates a null-terminated string, and SQLITE_STATIC tells SQLite the string won't change or be freed during execution.
     // 1,2,3,4,5 denotes the placeholder of ?,?,?,?,?
     sqlite3_bind_text(stmt, 1, currentYearMonth.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_double(stmt, 2, salary);
@@ -165,6 +160,7 @@ bool FinanceDB::addExpense(const std::string& spentOn, double price) {
     }
 
     std::string uniqueDayKey = getCurrentDayMonthYear() + "_" + std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    // This prevents issues if the string is temporary. Contrast with SQLITE_STATIC, which assumes the string is persistent and doesn't copy. Use TRANSIENT for local or changing strings. (like pass by value)
 
     sqlite3_bind_text(stmt, 1, uniqueDayKey.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, spentOn.c_str(), -1, SQLITE_STATIC);
@@ -215,8 +211,12 @@ void FinanceDB::updatePriority(const std::string& spentOn) {
 
 std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std::string end_date){
     std::vector<ExpenseRecord>summaries; 
-    
+    // The reinterpret_cast<const char*> is used because sqlite3_column_text returns a const unsigned char* (for UTF-8 bytes), but std::string constructors expect const char*. This cast safely converts the pointer type for string assignment, as UTF-8 bytes are compatible. It's necessary to assign the column text to e.day_month_year and e.spent_on. The cast doesn't change data, just the pointer type. Avoid modifying the returned string, as SQLite manages its lifetime.
+
+    //     reinterpret_cast<const char*> is used because unsigned char* and char* are unrelated pointer types, requiring a low-level reinterpretation of the pointer bits. static_cast doesn't work for unrelated pointers. dynamic_cast is for polymorphic classes, not applicable here. const_cast removes const, but doesn't change types. A C-style cast (const char*) would work but is less safe and explicit. reinterpret_cast is the correct, standard choice for this conversion.
+
     std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
+
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -236,6 +236,54 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
     }
     sqlite3_finalize(stmt);
     return summaries;
+}
+
+std::vector<ExpenseRecord> FinanceDB::getItemByDateRange(std::string item, std::string start_date, std::string end_date){
+    std::vector<ExpenseRecord>summaries;
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE SpentOn LIKE ? AND day_month_year BETWEEN ? AND ?";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+        std::string itemPattern = "%" + item + "%";
+        sqlite3_bind_text(stmt, 1, itemPattern.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 2, start_date.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_text(stmt, 3, end_date.c_str(), -1, SQLITE_STATIC);
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            ExpenseRecord e;
+            e.id = sqlite3_column_int(stmt, 0);
+            e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
+            e.price = sqlite3_column_double(stmt, 3);
+            e.priority = sqlite3_column_int(stmt, 4);
+            summaries.push_back(e);
+        }
+    } else {
+        std::cerr << "Failed to prepare statement for getItemByDateRange: " << sqlite3_errmsg(detailedDB) << std::endl;
+    }
+    sqlite3_finalize(stmt);
+    return summaries;
+}
+
+std::map<std::string, double> FinanceDB::getMonthlyTotalsForYear(int year){
+    std::map<std::string, double> monthlyTotals;
+    std::vector<std::string> months = {"01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"};
+    std::vector<std::string> monthNames = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+
+    for (size_t i = 0; i < months.size(); ++i) {
+        std::string tableName = "expenses_" + months[i] + "_" + std::to_string(year);
+        std::string sql = "SELECT SUM(Price) FROM " + tableName;
+        sqlite3_stmt* stmt;
+
+        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+            if (sqlite3_step(stmt) == SQLITE_ROW) {
+                double total = sqlite3_column_double(stmt, 0);
+                monthlyTotals[monthNames[i]] = total > 0 ? total : 0.0;
+            }
+            sqlite3_finalize(stmt);
+        } else {
+            monthlyTotals[monthNames[i]] = 0.0;
+        }
+    }
+    return monthlyTotals;
 }
 
 std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){

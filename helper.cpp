@@ -15,7 +15,7 @@ std::string format_date(const std::string &date_str) {
     return "";
   }
   std::ostringstream oss;
-  oss << std::put_time(&t, "%Y-%m-%d");
+  oss << std::put_time(&t, "%Y_%m_%d");
   return oss.str();
 }
 

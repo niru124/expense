@@ -137,6 +137,21 @@
             <div id="editExpenseOutput" class="mt-4 text-sm text-gray-800"></div>
         </div>
 
+        <!-- Yearly Expense Graph Section -->
+        <div class="mb-8 p-4 border rounded-lg bg-gray-50">
+            <h2 class="text-2xl font-semibold mb-4">Yearly Expense Graph</h2>
+            <form id="yearlyGraphForm" class="space-y-4 mb-4">
+                <div>
+                    <label for="graphYear" class="block text-sm font-medium text-gray-700">Year</label>
+                    <input type="number" id="graphYear" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 2025">
+                </div>
+                <button type="submit" class="w-full bg-purple-600 text-white p-2 rounded-md hover:bg-purple-700">Generate Graph</button>
+            </form>
+            <div id="yearlyGraphOutput" class="text-center">
+                <p class="text-gray-500">Click "Generate Graph" to view yearly expense visualization</p>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -336,6 +351,34 @@
                 } catch (error) {
                     console.error('Error updating expense:', error);
                     document.getElementById('editExpenseOutput').innerHTML = `<p class="text-red-600">Failed to update expense. Check console.</p>`;
+                }
+            });
+
+            // Yearly Graph Form
+            document.getElementById('yearlyGraphForm').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const yearInput = document.getElementById('graphYear').value;
+                const currentYear = new Date().getFullYear();
+                const year = yearInput ? parseInt(yearInput) : currentYear;
+
+                const outputDiv = document.getElementById('yearlyGraphOutput');
+                outputDiv.innerHTML = '<p class="text-gray-500">Loading graph...</p>';
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/graph/yearly/${year}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const svgContent = await response.text();
+                    outputDiv.innerHTML = `
+                        <h3 class="text-lg font-semibold mb-2">Yearly Expense Report - ${year}</h3>
+                        <div class="border rounded-lg p-4 bg-white">${svgContent}</div>
+                        <p class="text-sm text-gray-500 mt-2">Graph shows monthly expense breakdown for ${year}</p>
+                        <a href="${API_BASE_URL}/graph/yearly/${year}" target="_blank" class="text-blue-600 hover:underline text-sm">Open graph in new tab</a>
+                    `;
+                } catch (error) {
+                    console.error('Error fetching yearly graph:', error);
+                    outputDiv.innerHTML = `<p class="text-red-600">Failed to load yearly graph. Make sure gnuplot is installed and the backend is running.</p>`;
                 }
             });
         });

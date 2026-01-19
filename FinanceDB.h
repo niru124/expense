@@ -1,6 +1,7 @@
 #ifndef FINANCEDB_H
 #define FINANCEDB_H
 
+#include <map>
 #include <optional>
 #include <sqlite3.h>
 #include <string>
@@ -59,6 +60,10 @@ public:
   std::vector<ExpenseRecord> calcSortByPrice(bool order);
   std::vector<ExpenseRecord> getRangeOfDate(std::string start_date,
                                             std::string end_date);
+  std::vector<ExpenseRecord> getItemByDateRange(std::string item,
+                                                 std::string start_date,
+                                                 std::string end_date);
+  std::map<std::string, double> getMonthlyTotalsForYear(int year);
   double calcTotalSpent();
   bool deleteSelected(int id);
   bool updateSelected(int id, const std::optional<std::string> &spentOn,

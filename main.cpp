@@ -1,8 +1,13 @@
 #include "FinanceDB.h"
 #include "crow.h"
-#include "helper.h" // Include helper.h
+#include "helper.h"
 #include "crow/middlewares/cors.h"
+#include <sciplot/sciplot.hpp>
+#include <chrono>
+#include <ctime>
+#include <fstream>
 #include <memory>
+#include <sstream>
 
 int main() {
   auto db_ptr = std::make_shared<FinanceDB>("Main.db", "Detailed.db");
@@ -10,7 +15,7 @@ int main() {
   crow::App<crow::CORSHandler> app;
 
   CROW_ROUTE(app, "/")([]() {
-    return "<p>........working......</p>"
+    return "<p>........working.....</p>"
            "<div><a href='/summary'>View All Summaries</a></div>"
            "<div><a href='/expenses/08_2025'>View Expenses for August 2025 "
            "(example)</a></div>";
@@ -78,7 +83,6 @@ int main() {
         if (!isNumber(price)) {
           return crow::response(400, "Bad Request: 'price' must be a number.");
         }
-        // Priority is handled internally by addExpense and updatePriority
 
         if (!db_ptr->addExpense(spentOn, price)) {
           return crow::response(500, "Failed to add expense.");
@@ -104,9 +108,9 @@ int main() {
       response[i]["spent_on"] = prioritizedExpenses[i].spent_on;
       response[i]["average_price"] =
           prioritizedExpenses[i]
-              .price; // price in this context is average price
+              .price;
       response[i]["times_purchased"] =
-          prioritizedExpenses[i].priority; // priority in this context is count
+          prioritizedExpenses[i].priority;
     }
     return crow::response(response);
   });
@@ -145,11 +149,10 @@ int main() {
 
   CROW_ROUTE(app, "/sorted_by_price/<string>")
       .methods(crow::HTTPMethod::Get)([&db_ptr](const std::string &order_str) {
-        bool increasing = true; // Default to ascending
+        bool increasing = true;
         if (order_str == "false") {
           increasing = false;
         } else if (order_str != "true" && !order_str.empty()) {
-          // Handle invalid input, but allow empty string for default
           return crow::response(
               crow::status::BAD_REQUEST,
               "Invalid order parameter. Use 'true' for ascending, "
@@ -170,7 +173,6 @@ int main() {
 
   CROW_ROUTE(app, "/sorted_by_price/")
       .methods(crow::HTTPMethod::Get)([&db_ptr]() {
-        // This route will now default to ascending order
         auto sortedExpenses = db_ptr->calcSortByPrice(true);
         crow::json::wvalue response;
         for (size_t i = 0; i < sortedExpenses.size(); ++i) {
@@ -238,6 +240,94 @@ int main() {
         } else {
           return crow::response(500, "Failed to update expense with ID " + std::to_string(id) + ".");
         }
+      });
+
+  // auto detect current year
+  CROW_ROUTE(app, "/graph/yearly")
+      .methods(crow::HTTPMethod::Get)([&db_ptr]() {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+        std::tm* tm_local = std::localtime(&now_time);
+        int year = tm_local->tm_year + 1900;
+
+        auto monthlyTotals = db_ptr->getMonthlyTotalsForYear(year);
+
+        std::vector<std::string> months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        std::vector<double> values;
+        for (const auto& month : months) {
+            values.push_back(monthlyTotals[month]);
+        }
+
+        using namespace sciplot;
+        Plot2D plot;
+        plot.drawHistogram(values).label("Monthly Expenses for " + std::to_string(year));
+        plot.xlabel("Month");
+        plot.ylabel("Amount Spent");
+        plot.grid().show();
+
+        std::string xticLabels = "\"Jan\" 0, \"Feb\" 1, \"Mar\" 2, \"Apr\" 3, \"May\" 4, \"Jun\" 5, \"Jul\" 6, \"Aug\" 7, \"Sep\" 8, \"Oct\" 9, \"Nov\" 10, \"Dec\" 11";
+        plot.gnuplot("set xtics (" + xticLabels + ")");
+
+        Figure figure = {{plot}};
+        Canvas canvas = {{figure}};
+        canvas.size(800, 600);
+        canvas.title("Yearly Expense Report - " + std::to_string(year));
+
+        std::string tempFile = "/tmp/yearly_expense_graph_" + std::to_string(year) + ".svg";
+        canvas.save(tempFile);
+
+        std::ifstream file(tempFile);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string svgContent = buffer.str();
+        file.close();
+        std::remove(tempFile.c_str());
+
+        crow::response response;
+        response.set_header("Content-Type", "image/svg+xml");
+        response.body = svgContent;
+        return response;
+      });
+
+  CROW_ROUTE(app, "/graph/yearly/<int>")
+      .methods(crow::HTTPMethod::Get)([&db_ptr](int year) {
+        auto monthlyTotals = db_ptr->getMonthlyTotalsForYear(year);
+
+        std::vector<std::string> months = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        std::vector<double> values;
+        for (const auto& month : months) {
+            values.push_back(monthlyTotals[month]);
+        }
+
+        using namespace sciplot;
+        Plot2D plot;
+        plot.drawHistogram(values).label("Monthly Expenses for " + std::to_string(year));
+        plot.xlabel("Month");
+        plot.ylabel("Amount Spent");
+        plot.grid().show();
+
+        std::string xticLabels = "\"Jan\" 0, \"Feb\" 1, \"Mar\" 2, \"Apr\" 3, \"May\" 4, \"Jun\" 5, \"Jul\" 6, \"Aug\" 7, \"Sep\" 8, \"Oct\" 9, \"Nov\" 10, \"Dec\" 11";
+        plot.gnuplot("set xtics (" + xticLabels + ")");
+
+        Figure figure = {{plot}};
+        Canvas canvas = {{figure}};
+        canvas.size(800, 600);
+        canvas.title("Yearly Expense Report - " + std::to_string(year));
+
+        std::string tempFile = "/tmp/yearly_expense_graph_" + std::to_string(year) + ".svg";
+        canvas.save(tempFile);
+
+        std::ifstream file(tempFile);
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        std::string svgContent = buffer.str();
+        file.close();
+        std::remove(tempFile.c_str());
+
+        crow::response response;
+        response.set_header("Content-Type", "image/svg+xml");
+        response.body = svgContent;
+        return response;
       });
 
   std::cout << "Starting server on port 5000..." << std::endl;
