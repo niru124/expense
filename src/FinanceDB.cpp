@@ -76,7 +76,7 @@ void FinanceDB::initMainDB() {
                       "month_year TEXT PRIMARY KEY,"
                       "Salary REAL NOT NULL,"
                       "LimitAmount REAL NOT NULL,"
-                      "SavingPercentage REAL," //double
+                      "SavingPercentage REAL,"
                       "Condition TEXT);";
     executeSQL(mainDB, sql);
 }
@@ -86,18 +86,19 @@ void FinanceDB::initDetailedDB() {
                       "day_month_year TEXT PRIMARY KEY,"
                       "SpentOn TEXT NOT NULL,"
                       "Price REAL NOT NULL,"
-                        "Priority INTEGER DEFAULT 0);";
+                      "Category TEXT,"
+                      "Priority INTEGER DEFAULT 0);";
     executeSQL(detailedDB, sql);
 }
 
 double FinanceDB::calculateCurrentSavings(double salary) {
-    std::string sql = "SELECT Price FROM " + currentTableName + ";";
+    std::string sql = "SELECT SUM(Price) FROM " + currentTableName + ";";
     sqlite3_stmt* stmt;
     double totalSpent = 0.0;
-    // This code prepares and executes a SQL SELECT query on detailedDB. If preparation succeeds (SQLITE_OK), it steps through each result row, adding the value from the first column (as a double) to totalSpent. After processing all rows, it finalizes the statement to free resources. It's summing numerical values
+    
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
-        while (sqlite3_step(stmt) == SQLITE_ROW) {
-            totalSpent += sqlite3_column_double(stmt, 0);
+        if (sqlite3_step(stmt) == SQLITE_ROW) {
+            totalSpent = sqlite3_column_double(stmt, 0);
         }
     }
     sqlite3_finalize(stmt);
@@ -125,7 +126,7 @@ bool FinanceDB::addOrUpdateMonthlySummary(double salary, double limit) {
     std::string sql = "INSERT INTO Overall (month_year, Salary, LimitAmount, SavingPercentage, Condition) VALUES (?, ?, ?, ?, ?)"
                       "ON CONFLICT(month_year) DO UPDATE SET "
                       "Salary=excluded.Salary, LimitAmount=excluded.LimitAmount, SavingPercentage=excluded.SavingPercentage, Condition=excluded.Condition;";
-                      // This updates the existing row instead of inserting a new one. It uses the excluded keyword, which refers to the values that were attempted to be inserted.
+                       // This updates the existing row instead of inserting a new one. It uses the excluded keyword, which refers to the values that were attempted to be inserted.
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(mainDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
         std::cerr << "Failed to prepare statement: " << sqlite3_errmsg(mainDB) << std::endl;
@@ -148,10 +149,10 @@ bool FinanceDB::addOrUpdateMonthlySummary(double salary, double limit) {
     return true;
 }
 
-bool FinanceDB::addExpense(const std::string& spentOn, double price) {
+bool FinanceDB::addExpense(const std::string& spentOn, double price, const std::optional<std::string>& category) {
     if (!detailedDB) return false;
 
-    std::string sql = "INSERT INTO " + currentTableName + " (day_month_year, SpentOn, Price, Priority) VALUES (?, ?, ?, 0);";
+    std::string sql = "INSERT INTO " + currentTableName + " (day_month_year, SpentOn, Price, Category, Priority) VALUES (?, ?, ?, ?, 0);";
     
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
@@ -165,6 +166,12 @@ bool FinanceDB::addExpense(const std::string& spentOn, double price) {
     sqlite3_bind_text(stmt, 1, uniqueDayKey.c_str(), -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 2, spentOn.c_str(), -1, SQLITE_STATIC);
     sqlite3_bind_double(stmt, 3, price);
+    
+    if (category && !category->empty()) {
+        sqlite3_bind_text(stmt, 4, category->c_str(), -1, SQLITE_STATIC);
+    } else {
+        sqlite3_bind_null(stmt, 4);
+    }
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         std::cerr << "Execution failed: " << sqlite3_errmsg(detailedDB) << std::endl;
@@ -215,7 +222,7 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
 
     //     reinterpret_cast<const char*> is used because unsigned char* and char* are unrelated pointer types, requiring a low-level reinterpretation of the pointer bits. static_cast doesn't work for unrelated pointers. dynamic_cast is for polymorphic classes, not applicable here. const_cast removes const, but doesn't change types. A C-style cast (const char*) would work but is less safe and explicit. reinterpret_cast is the correct, standard choice for this conversion.
 
-    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
 
     sqlite3_stmt* stmt;
 
@@ -228,7 +235,8 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
             e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
-            e.priority = sqlite3_column_int(stmt, 4);
+            e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            e.priority = sqlite3_column_int(stmt, 5);
             summaries.push_back(e);
         }
     } else {
@@ -240,7 +248,7 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
 
 std::vector<ExpenseRecord> FinanceDB::getItemByDateRange(std::string item, std::string start_date, std::string end_date){
     std::vector<ExpenseRecord>summaries;
-    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" WHERE SpentOn LIKE ? AND day_month_year BETWEEN ? AND ?";
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM "+currentTableName+" WHERE SpentOn LIKE ? AND day_month_year BETWEEN ? AND ?";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
         std::string itemPattern = "%" + item + "%";
@@ -253,7 +261,8 @@ std::vector<ExpenseRecord> FinanceDB::getItemByDateRange(std::string item, std::
             e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
-            e.priority = sqlite3_column_int(stmt, 4);
+            e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            e.priority = sqlite3_column_int(stmt, 5);
             summaries.push_back(e);
         }
     } else {
@@ -289,7 +298,7 @@ std::map<std::string, double> FinanceDB::getMonthlyTotalsForYear(int year){
 std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){
     std::vector<ExpenseRecord>summaries; 
     std::string ordering=(order)?"ASC":"DESC";
-    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -299,7 +308,8 @@ std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){
             e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
-            e.priority = sqlite3_column_int(stmt, 4);
+            e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            e.priority = sqlite3_column_int(stmt, 5);
             summaries.push_back(e);
         }
     }
@@ -329,7 +339,7 @@ std::vector<MonthlySummary> FinanceDB::getAllSummaries() {
 
 std::vector<ExpenseRecord> FinanceDB::getSortedByVal() {
     std::vector<ExpenseRecord> summaries;
-    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Priority FROM " + currentTableName + " ORDER BY Price DESC;";
+    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM " + currentTableName + " ORDER BY Price DESC;";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -339,7 +349,8 @@ std::vector<ExpenseRecord> FinanceDB::getSortedByVal() {
             e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
-            e.priority = sqlite3_column_int(stmt, 4);
+            e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            e.priority = sqlite3_column_int(stmt, 5);
             summaries.push_back(e);
         }
     }
@@ -373,7 +384,7 @@ std::vector<ExpenseRecord> FinanceDB::calcPriority() {
 std::vector<ExpenseRecord> FinanceDB::getExpensesForMonth(const std::string& monthYear) {
     std::vector<ExpenseRecord> expenses;
     std::string tableName = "expenses_" + monthYear;
-    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Priority FROM " + tableName + ";";
+    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM " + tableName + ";";
     sqlite3_stmt* stmt;
 
     // Check if the table exists by preparing the statement. If it fails, return empty.
@@ -384,7 +395,8 @@ std::vector<ExpenseRecord> FinanceDB::getExpensesForMonth(const std::string& mon
             e.day_month_year = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
-            e.priority = sqlite3_column_int(stmt, 4);
+            e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+            e.priority = sqlite3_column_int(stmt, 5);
             expenses.push_back(e);
         }
     } else {
@@ -449,73 +461,9 @@ bool FinanceDB::deleteSelected(int id) {
     return true;
 }
 
-bool FinanceDB::updateSelected(int id, const std::optional<std::string>& spentOn, const std::optional<double>& price, const std::optional<int>& priority) {
-    if (!detailedDB) return false;
-
-    bool anyUpdated = false;
-
-    if (spentOn) {
-        std::string sql = "UPDATE " + currentTableName + " SET SpentOn = ? WHERE rowid = ?;";
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
-            std::cerr << "Failed to prepare statement for SpentOn update: " << sqlite3_errmsg(detailedDB) << std::endl;
-            return false;
-        }
-        sqlite3_bind_text(stmt, 1, spentOn->c_str(), -1, SQLITE_STATIC);
-        sqlite3_bind_int(stmt, 2, id);
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
-            std::cerr << "Execution failed for SpentOn update: " << sqlite3_errmsg(detailedDB) << std::endl;
-            sqlite3_finalize(stmt);
-            return false;
-        }
-        sqlite3_finalize(stmt);
-        anyUpdated = true;
-    }
-
-    if (price) {
-        std::string sql = "UPDATE " + currentTableName + " SET Price = ? WHERE rowid = ?;";
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
-            std::cerr << "Failed to prepare statement for Price update: " << sqlite3_errmsg(detailedDB) << std::endl;
-            return false;
-        }
-        sqlite3_bind_double(stmt, 1, *price);
-        sqlite3_bind_int(stmt, 2, id);
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
-            std::cerr << "Execution failed for Price update: " << sqlite3_errmsg(detailedDB) << std::endl;
-            sqlite3_finalize(stmt);
-            return false;
-        }
-        sqlite3_finalize(stmt);
-        anyUpdated = true;
-    }
-
-    if (priority) {
-        std::string sql = "UPDATE " + currentTableName + " SET Priority = ? WHERE rowid = ?;";
-        sqlite3_stmt* stmt = nullptr;
-        if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
-            std::cerr << "Failed to prepare statement for Priority update: " << sqlite3_errmsg(detailedDB) << std::endl;
-            return false;
-        }
-        sqlite3_bind_int(stmt, 1, *priority);
-        sqlite3_bind_int(stmt, 2, id);
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
-            std::cerr << "Execution failed for Priority update: " << sqlite3_errmsg(detailedDB) << std::endl;
-            sqlite3_finalize(stmt);
-            return false;
-        }
-        sqlite3_finalize(stmt);
-        anyUpdated = true;
-    }
-
-    if (!anyUpdated) {
-        std::cerr << "No fields were updated for id: " << id << std::endl;
-    }
-
-    return anyUpdated;
-}
-
-bool FinanceDB::updateSelected2(int id, const std::optional<std::string>& spentOn, const std::optional<double>& price, const std::optional<int>& priority) {
+bool FinanceDB::updateSelected2(int id, const std::optional<std::string>& spentOn,
+                               const std::optional<double>& price,
+                               const std::optional<int>& priority) {
     if (!detailedDB) return false;
 
     std::vector<std::string> update_clauses;

@@ -22,6 +22,19 @@
                     <label for="amount" class="block text-sm font-medium text-gray-700">Amount</label>
                     <input type="number" id="amount" name="amount" step="0.01" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
                 </div>
+                <div>
+                    <label for="categorySelect" class="block text-sm font-medium text-gray-700">Category (Optional)</label>
+                    <div class="flex gap-2">
+                        <select id="categorySelect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- No Category --</option>
+                            <option value="new">+ Create New Category</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="newCategoryDiv" class="hidden">
+                    <label for="newCategory" class="block text-sm font-medium text-gray-700">New Category Name</label>
+                    <input type="text" id="newCategory" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter new category name">
+                </div>
                 <button type="submit" class="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Add Expense</button>
             </form>
         </div>
@@ -129,6 +142,10 @@
                     <input type="number" id="editPrice" step="0.01" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
                 </div>
                 <div>
+                    <label for="editCategory" class="block text-sm font-medium text-gray-700">New Category (Optional)</label>
+                    <input type="text" id="editCategory" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Leave empty to keep current category">
+                </div>
+                <div>
                     <label for="editPriority" class="block text-sm font-medium text-gray-700">New Priority (Optional)</label>
                     <input type="number" id="editPriority" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
                 </div>
@@ -156,12 +173,65 @@
 
     <script>
         const API_BASE_URL = 'http://localhost:5000'; // C++ backend runs on port 5000
+        let existingCategories = new Set();
 
         function getCurrentMonthYear() {
             const date = new Date();
             const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
             const year = date.getFullYear();
             return `${month}_${year}`;
+        }
+
+        async function fetchCategories() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/categories`);
+                if (response.ok) {
+                    const categories = await response.json();
+                    updateCategoryDropdown(categories);
+                }
+            } catch (error) {
+                console.error('Error fetching categories:', error);
+            }
+        }
+
+        function updateCategoryDropdown(categories) {
+            const select = document.getElementById('categorySelect');
+            const currentValue = select.value;
+            
+            // Preserve custom "new" option
+            const hasNewOption = select.querySelector('option[value="new"]');
+            
+            // Clear existing category options (keep first two: "" and "new")
+            while (select.options.length > 2) {
+                select.remove(2);
+            }
+            
+            // Add categories back
+            categories.forEach(cat => {
+                if (cat && cat.trim()) {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    select.appendChild(option);
+                }
+            });
+            
+            // Restore selection if it was a category
+            if (categories.includes(currentValue)) {
+                select.value = currentValue;
+            } else {
+                select.value = "";
+            }
+        }
+
+        function collectAllCategories() {
+            const categories = new Set();
+            const categoryBadges = document.querySelectorAll('#expensesList .category-badge');
+            categoryBadges.forEach(el => {
+                const cat = el.textContent.replace('Category:', '').trim();
+                if (cat) categories.add(cat);
+            });
+            return Array.from(categories);
         }
 
         // Helper to format date for backend (DD-MM-YYYY)
@@ -175,12 +245,34 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             fetchExpenses(); // Initial load of current month's expenses
+            fetchCategories(); // Load categories from backend
+
+            // Category dropdown change handler
+            document.getElementById('categorySelect').addEventListener('change', function() {
+                const newCategoryDiv = document.getElementById('newCategoryDiv');
+                if (this.value === 'new') {
+                    newCategoryDiv.classList.remove('hidden');
+                    document.getElementById('newCategory').focus();
+                } else {
+                    newCategoryDiv.classList.add('hidden');
+                }
+            });
 
             // Add Expense Form
             document.getElementById('addExpenseForm').addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const description = document.getElementById('description').value;
                 const amount = parseFloat(document.getElementById('amount').value);
+                
+                let category = null;
+                const categorySelect = document.getElementById('categorySelect').value;
+                const newCategoryInput = document.getElementById('newCategory').value.trim();
+                
+                if (categorySelect === 'new' && newCategoryInput) {
+                    category = newCategoryInput;
+                } else if (categorySelect && categorySelect !== 'new') {
+                    category = categorySelect;
+                }
 
                 try {
                     const response = await fetch(`${API_BASE_URL}/expense`, {
@@ -188,7 +280,11 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({ spentOn: description, price: amount }),
+                        body: JSON.stringify({ 
+                            spentOn: description, 
+                            price: amount,
+                            ...(category && { category })
+                        }),
                     });
 
                     if (!response.ok) {
@@ -199,7 +295,13 @@
                     console.log('Expense added:', result);
                     document.getElementById('description').value = '';
                     document.getElementById('amount').value = '';
+                    document.getElementById('categorySelect').value = '';
+                    document.getElementById('newCategory').value = '';
+                    document.getElementById('newCategoryDiv').classList.add('hidden');
                     fetchExpenses(); // Refresh the list
+                    
+                    // Refresh categories from backend (this will add the new category if it was created)
+                    fetchCategories();
                 } catch (error) {
                     console.error('Error adding expense:', error);
                     alert('Failed to add expense. Check console for details.');
@@ -293,6 +395,21 @@
             document.getElementById('deleteExpenseForm').addEventListener('submit', async (event) => {
                 event.preventDefault();
                 const id = parseInt(document.getElementById('deleteId').value);
+                
+                // Get category of expense being deleted
+                let deletedCategory = null;
+                try {
+                    const response = await fetch(`${API_BASE_URL}/expenses/${getCurrentMonthYear()}`);
+                    if (response.ok) {
+                        const expenses = await response.json();
+                        const expenseToDelete = expenses.find(e => e.id === id);
+                        if (expenseToDelete && expenseToDelete.category && expenseToDelete.category.trim()) {
+                            deletedCategory = expenseToDelete.category;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error fetching expense for category check:', e);
+                }
 
                 try {
                     const response = await fetch(`${API_BASE_URL}/delete_expense/${id}`, {
@@ -306,7 +423,13 @@
                     const result = await response.text();
                     document.getElementById('deleteExpenseOutput').innerHTML = `<p class="text-green-600">${result}</p>`;
                     console.log('Expense deleted:', result);
-                    fetchExpenses(); // Refresh current month's expenses
+                    
+                    // Update category dropdown if needed (after expenses refresh)
+                    if (deletedCategory) {
+                        fetchExpensesWithCategoryCheck(deletedCategory);
+                    } else {
+                        fetchExpenses();
+                    }
                 } catch (error) {
                     console.error('Error deleting expense:', error);
                     document.getElementById('deleteExpenseOutput').innerHTML = `<p class="text-red-600">Failed to delete expense. Check console.</p>`;
@@ -319,11 +442,13 @@
                 const id = parseInt(document.getElementById('editId').value);
                 const spentOn = document.getElementById('editSpentOn').value;
                 const price = document.getElementById('editPrice').value;
+                const category = document.getElementById('editCategory').value;
                 const priority = document.getElementById('editPriority').value;
 
                 const updateData = {};
                 if (spentOn) updateData.spentOn = spentOn;
                 if (price) updateData.price = parseFloat(price);
+                if (category) updateData.category = category;
                 if (priority) updateData.priority = parseInt(priority);
 
                 if (Object.keys(updateData).length === 0) {
@@ -384,6 +509,37 @@
         });
 
         // --- API Call Functions ---
+
+        async function fetchExpensesWithCategoryCheck(deletedCategory = null) {
+            const expensesList = document.getElementById('expensesList');
+            expensesList.innerHTML = '<p class="text-gray-500 text-center">Loading expenses...</p>';
+
+            const currentMonthYear = getCurrentMonthYear();
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/expenses/${currentMonthYear}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const expenses = await response.json();
+                displayExpenses(expenses, 'expensesList', 'No expenses recorded yet for this month.');
+                
+                // Check if we need to remove a category that has no more expenses
+                if (deletedCategory) {
+                    const categoriesAfterDelete = expenses
+                        .map(e => e.category)
+                        .filter(c => c && c.trim());
+                    
+                    // If no remaining expenses have this category, refresh categories from backend
+                    if (!categoriesAfterDelete.includes(deletedCategory)) {
+                        fetchCategories();
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching expenses:', error);
+                expensesList.innerHTML = '<p class="text-red-500 text-center">Failed to load expenses. Please ensure the C++ backend is running on port 5000 and accessible.</p>';
+            }
+        }
 
         async function fetchExpenses() {
             const expensesList = document.getElementById('expensesList');
@@ -487,8 +643,14 @@
                 expenseItem.className = 'flex justify-between items-center bg-gray-50 p-4 rounded-md shadow-sm';
                 // Check if 'id' exists, as some endpoints (like /highest) don't return it directly
                 const idDisplay = expense.id ? ` (ID: ${expense.id})` : '';
+                const categoryDisplay = expense.category && expense.category.trim() 
+                    ? `<span class="category-badge text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">Category: ${expense.category}</span>` 
+                    : '';
                 expenseItem.innerHTML = `
-                    <span class="text-lg font-medium">${expense.spent_on}${idDisplay}</span>
+                    <div class="flex items-center">
+                        <span class="text-lg font-medium">${expense.spent_on}${idDisplay}</span>
+                        ${categoryDisplay}
+                    </div>
                     <span class="text-lg font-bold text-green-600">$${expense.price.toFixed(2)}</span>
                 `;
                 outputDiv.appendChild(expenseItem);

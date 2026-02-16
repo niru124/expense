@@ -7,7 +7,18 @@
 #include <ctime>
 #include <fstream>
 #include <memory>
+#include <algorithm>
 #include <sstream>
+
+std::string getCurrentMonthYearStr() {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+    std::tm tm_local;
+    localtime_r(&now_time, &tm_local);
+    char buffer[20];
+    strftime(buffer, sizeof(buffer), "%m_%Y", &tm_local);
+    return std::string(buffer);
+}
 
 int main() {
   auto db_ptr = std::make_shared<FinanceDB>("Main.db", "Detailed.db");
@@ -43,6 +54,7 @@ int main() {
           response[i]["day_month_year"] = expenses[i].day_month_year;
           response[i]["spent_on"] = expenses[i].spent_on;
           response[i]["price"] = expenses[i].price;
+          response[i]["category"] = expenses[i].category;
           response[i]["priority"] = expenses[i].priority;
         }
         return crow::response(response);
@@ -70,7 +82,7 @@ int main() {
       });
 
   CROW_ROUTE(app, "/expense")
-      .methods(crow::HTTPMethod::Post)([&db_ptr](const crow::request &req) {
+      .methods(crow::HTTPMethod::POST)([&db_ptr](const crow::request &req) {
         auto data = crow::json::load(req.body);
         if (!data || !data.has("spentOn") || !data.has("price")) {
           return crow::response(400,
@@ -84,7 +96,15 @@ int main() {
           return crow::response(400, "Bad Request: 'price' must be a number.");
         }
 
-        if (!db_ptr->addExpense(spentOn, price)) {
+        std::optional<std::string> category = std::nullopt;
+        if (data.has("category")) {
+          category = refinedString(data["category"].s());
+          if (category->empty()) {
+            category = std::nullopt;
+          }
+        }
+
+        if (!db_ptr->addExpense(spentOn, price, category)) {
           return crow::response(500, "Failed to add expense.");
         }
 
@@ -142,6 +162,7 @@ int main() {
           response[i]["day_month_year"] = rangedExpenses[i].day_month_year;
           response[i]["spent_on"] = rangedExpenses[i].spent_on;
           response[i]["price"] = rangedExpenses[i].price;
+          response[i]["category"] = rangedExpenses[i].category;
           response[i]["priority"] = rangedExpenses[i].priority;
         }
         return crow::response(response);
@@ -166,6 +187,7 @@ int main() {
           response[i]["day_month_year"] = sortedExpenses[i].day_month_year;
           response[i]["spent_on"] = sortedExpenses[i].spent_on;
           response[i]["price"] = sortedExpenses[i].price;
+          response[i]["category"] = sortedExpenses[i].category;
           response[i]["priority"] = sortedExpenses[i].priority;
         }
         return crow::response(response);
@@ -180,6 +202,7 @@ int main() {
           response[i]["day_month_year"] = sortedExpenses[i].day_month_year;
           response[i]["spent_on"] = sortedExpenses[i].spent_on;
           response[i]["price"] = sortedExpenses[i].price;
+          response[i]["category"] = sortedExpenses[i].category;
           response[i]["priority"] = sortedExpenses[i].priority;
         }
         return crow::response(response);
@@ -189,6 +212,26 @@ int main() {
     double totalSpentAmount = db_ptr->calcTotalSpent();
     crow::json::wvalue response;
     response["total"] = totalSpentAmount;
+    return crow::response(response);
+  });
+
+  CROW_ROUTE(app, "/categories").methods(crow::HTTPMethod::Get)([&db_ptr]() {
+    std::string monthYear = getCurrentMonthYearStr();
+    auto expenses = db_ptr->getExpensesForMonth(monthYear);
+    std::vector<std::string> categories;
+    for (const auto& expense : expenses) {
+      if (!expense.category.empty()) {
+        categories.push_back(expense.category);
+      }
+    }
+    // Remove duplicates
+    std::sort(categories.begin(), categories.end());
+    categories.erase(std::unique(categories.begin(), categories.end()), categories.end());
+    
+    crow::json::wvalue response;
+    for (size_t i = 0; i < categories.size(); ++i) {
+      response[i] = categories[i];
+    }
     return crow::response(response);
   });
 

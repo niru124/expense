@@ -4,9 +4,35 @@ This project consists of a C++ backend for managing personal finance data (using
 
 ## Project Structure
 
-*   `./`: Contains the C++ backend source files (`main.cpp`, `FinanceDB.h`, `FinanceDB.cpp`, `helper.h`, `helper.cpp`), CMake build files, and the `run.sh` script.
-*   `./frontend/`: Contains the static HTML frontend (`index.html`) with Tailwind CSS via CDN and JavaScript for API calls.
-*   `backend_server.py`: A Python Flask server that serves the `frontend/index.html` and acts as a simple static file server for the frontend.
+```
+expense/
+├── CMakeLists.txt          # CMake build configuration
+├── README.md               # This file
+├── study.md               # Study notes
+├── todo.md                # Todo list
+├── .gitignore             # Git ignore rules
+├── backend_server.py      # Python Flask server for frontend
+├── run.sh                # Quick start script (in scripts/)
+├── sciplot/              # Third-party plotting library (header-only)
+├── frontend/             # HTML/Tailwind CSS frontend
+│   └── index.html
+├── src/                  # C++ source files
+│   ├── main.cpp          # Main entry point and API routes
+│   ├── FinanceDB.cpp     # Database operations
+│   └── helper.cpp        # Helper utilities
+├── include/              # Header files
+│   ├── FinanceDB.h       # Database class declarations
+│   └── helper.h          # Helper function declarations
+└── build/                # Build output directory (created by CMake)
+```
+
+## Directory Descriptions
+
+- **`src/`**: Contains all C++ source files (.cpp). This is where the main application logic lives.
+- **`include/`**: Contains all C++ header files (.h) for class declarations and function prototypes.
+- **`frontend/`**: Contains the static HTML frontend with Tailwind CSS via CDN and JavaScript for API calls.
+- **`scripts/`**: Contains utility scripts like `run.sh` for building and running the application.
+- **`sciplot/`**: Third-party header-only library for generating expense graphs.
 
 ## How to Run the Application
 
@@ -32,12 +58,12 @@ Before compiling and running, ensure you have the necessary tools and libraries 
 
 2.  **Make the `run.sh` script executable** (if you haven't already):
     ```bash
-    chmod +x run.sh
+    chmod +x scripts/run.sh
     ```
 
 3.  **Execute the `run.sh` script:**
     ```bash
-    ./run.sh
+    ./scripts/run.sh
     ```
     This script will:
     *   Build the C++ backend using CMake.
@@ -48,6 +74,35 @@ Before compiling and running, ensure you have the necessary tools and libraries 
 4.  **Access the Frontend:** Open your web browser and navigate to `http://localhost:8000`.
 
     *To stop both servers, simply press `Ctrl+C` in the terminal where `run.sh` is running.*
+
+### Manual Build and Run
+
+If you prefer to build and run manually:
+
+1.  **Create and navigate to build directory:**
+    ```bash
+    mkdir -p build && cd build
+    ```
+
+2.  **Configure with CMake:**
+    ```bash
+    cmake ..
+    ```
+
+3.  **Build the project:**
+    ```bash
+    cmake --build .
+    ```
+
+4.  **Run the C++ backend:**
+    ```bash
+    ./expense &
+    ```
+
+5.  **Start the Python frontend server** (from project root):
+    ```bash
+    python3 backend_server.py &
+    ```
 
 ## C++ Backend API Endpoints
 

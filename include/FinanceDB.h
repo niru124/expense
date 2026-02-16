@@ -22,6 +22,7 @@ struct ExpenseRecord {
   std::string day_month_year;
   std::string spent_on;
   double price;
+  std::string category;
   int priority;
 };
 
@@ -46,33 +47,26 @@ public:
 
   // --- Methods for Adding Data ---
   bool addOrUpdateMonthlySummary(double salary, double limit);
-  bool addExpense(const std::string &spentOn, double price);
+  bool addExpense(const std::string &spentOn, double price, const std::optional<std::string> &category = std::nullopt);
   void updatePriority(const std::string &spentOn);
 
-  // --- New Methods for Viewing Data ---
+  // --- Methods for Viewing Data ---
   std::vector<MonthlySummary> getAllSummaries();
-  std::vector<ExpenseRecord>
-  getExpensesForMonth(const std::string &monthYear); // e.g., "08_2025"
+  std::vector<ExpenseRecord> getExpensesForMonth(const std::string &monthYear);
   MonthlySummary getCurrentMonthSummary();
 
   std::vector<ExpenseRecord> getSortedByVal();
   std::vector<ExpenseRecord> calcPriority();
   std::vector<ExpenseRecord> calcSortByPrice(bool order);
-  std::vector<ExpenseRecord> getRangeOfDate(std::string start_date,
-                                            std::string end_date);
-  std::vector<ExpenseRecord> getItemByDateRange(std::string item,
-                                                 std::string start_date,
-                                                 std::string end_date);
+  std::vector<ExpenseRecord> getRangeOfDate(std::string start_date, std::string end_date);
+  std::vector<ExpenseRecord> getItemByDateRange(std::string item, std::string start_date, std::string end_date);
   std::map<std::string, double> getMonthlyTotalsForYear(int year);
   double calcTotalSpent();
   bool deleteSelected(int id);
-  bool updateSelected(int id, const std::optional<std::string> &spentOn,
-                      const std::optional<double> &price,
-                      const std::optional<int> &priority);
 
   bool updateSelected2(int id, const std::optional<std::string> &spentOn,
-                       const std::optional<double> &price,
-                       const std::optional<int> &priority);
+                      const std::optional<double> &price,
+                      const std::optional<int> &priority);
 };
 
 #endif // FINANCEDB_H

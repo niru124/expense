@@ -14,8 +14,13 @@ cleanup() {
 
 trap cleanup EXIT
 
+# Get the directory where the script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
 # 1. Build the C++ backend
 echo "Building C++ backend..."
+cd "$PROJECT_DIR"
 cmake -B build && cmake --build build
 
 if [ $? -ne 0 ]; then
