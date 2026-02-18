@@ -1,14 +1,123 @@
 #include "FinanceDB.h"
-#include "crow.h"
+#include "crow_all.h"
 #include "helper.h"
-#include "crow/middlewares/cors.h"
+#include <sqlite3.h>
+#include <sodium.h>
 #include <sciplot/sciplot.hpp>
 #include <chrono>
 #include <ctime>
 #include <fstream>
 #include <memory>
 #include <algorithm>
-#include <sstream>
+#include <string>
+#include <map>
+#include <mutex>
+#include <iostream>
+
+sqlite3* auth_db;
+
+const int SESSION_EXPIRE_SECONDS = 3600;
+
+std::map<std::string, std::pair<int, time_t>> sessions;
+std::mutex sessions_mutex;
+
+std::string generate_session_token() {
+    unsigned char token[32];
+    randombytes_buf(token, sizeof token);
+    char hex[65];
+    sodium_bin2hex(hex, sizeof hex, token, sizeof token);
+    return std::string(hex);
+}
+
+int get_session_user_id(const crow::request& req) {
+    std::string cookies = req.get_header_value("cookie");
+    if (cookies.empty()) return -1;
+    
+    size_t pos = cookies.find("session=");
+    if (pos == std::string::npos) return -1;
+    pos += 8;
+    size_t end = cookies.find(";", pos);
+    if (end == std::string::npos) end = cookies.length();
+    std::string token = cookies.substr(pos, end - pos);
+    
+    std::lock_guard<std::mutex> lock(sessions_mutex);
+    auto it = sessions.find(token);
+    if (it == sessions.end()) return -1;
+    
+    time_t now = std::time(nullptr);
+    if (now > it->second.second) {
+        sessions.erase(token);
+        return -1;
+    }
+    
+    return it->second.first;
+}
+
+bool init_auth_database() {
+    char* err_msg = nullptr;
+    const char* sql = "CREATE TABLE IF NOT EXISTS users ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                      "username TEXT UNIQUE NOT NULL,"
+                      "password_hash TEXT NOT NULL"
+                      ");"
+                      "CREATE TABLE IF NOT EXISTS expenses ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                      "user_id INTEGER NOT NULL,"
+                      "day_month_year TEXT NOT NULL,"
+                      "spent_on TEXT NOT NULL,"
+                      "price REAL NOT NULL,"
+                      "category TEXT,"
+                      "priority INTEGER DEFAULT 0,"
+                      "FOREIGN KEY(user_id) REFERENCES users(id)"
+                      ");"
+                      "CREATE TABLE IF NOT EXISTS summaries ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                      "user_id INTEGER NOT NULL,"
+                      "month_year TEXT NOT NULL,"
+                      "salary REAL NOT NULL,"
+                      "limit_amount REAL NOT NULL,"
+                      "saving_percentage REAL,"
+                      "condition TEXT,"
+                      "UNIQUE(user_id, month_year),"
+                      "FOREIGN KEY(user_id) REFERENCES users(id)"
+                      ");";
+    int rc = sqlite3_exec(auth_db, sql, nullptr, nullptr, &err_msg);
+    if (rc != SQLITE_OK) { 
+        std::cerr << "Auth DB Error: " << err_msg << std::endl; 
+        sqlite3_free(err_msg); 
+        return false; 
+    }
+    return true;
+}
+
+bool register_user(const std::string& username, const std::string& password) {
+    if (username.length() < 3 || username.length() > 32) return false;
+    if (password.length() < 6) return false;
+    
+    char hashed[crypto_pwhash_STRBYTES];
+    if (crypto_pwhash_str(hashed, password.c_str(), password.length(),
+                          crypto_pwhash_OPSLIMIT_INTERACTIVE, crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0) return false;
+    
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(auth_db, "INSERT INTO users (username, password_hash) VALUES (?, ?)", -1, &stmt, nullptr) != SQLITE_OK) return false;
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, hashed, -1, SQLITE_TRANSIENT);
+    bool ok = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return ok;
+}
+
+int verify_login(const std::string& username, const std::string& password) {
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(auth_db, "SELECT id, password_hash FROM users WHERE username = ?", -1, &stmt, nullptr) != SQLITE_OK) return -1;
+    sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_TRANSIENT);
+    if (sqlite3_step(stmt) != SQLITE_ROW) { sqlite3_finalize(stmt); return -1; }
+    int user_id = sqlite3_column_int(stmt, 0);
+    const char* stored = (const char*)sqlite3_column_text(stmt, 1);
+    bool ok = (crypto_pwhash_str_verify(stored, password.c_str(), password.length()) == 0);
+    sqlite3_finalize(stmt);
+    return ok ? user_id : -1;
+}
 
 std::string getCurrentMonthYearStr() {
     auto now = std::chrono::system_clock::now();
@@ -21,18 +130,106 @@ std::string getCurrentMonthYearStr() {
 }
 
 int main() {
+  if (sodium_init() < 0) {
+    std::cerr << "Failed to initialize libsodium" << std::endl;
+    return 1;
+  }
+  if (sqlite3_open("auth.db", &auth_db) != SQLITE_OK) {
+    std::cerr << "Failed to open auth database" << std::endl;
+    return 1;
+  }
+  if (!init_auth_database()) {
+    std::cerr << "Failed to initialize auth database" << std::endl;
+    return 1;
+  }
+
   auto db_ptr = std::make_shared<FinanceDB>("Main.db", "Detailed.db");
 
   crow::App<crow::CORSHandler> app;
 
-  CROW_ROUTE(app, "/")([]() {
-    return "<p>........working.....</p>"
-           "<div><a href='/summary'>View All Summaries</a></div>"
-           "<div><a href='/expenses/08_2025'>View Expenses for August 2025 "
-           "(example)</a></div>";
+  CROW_ROUTE(app, "/")([]{ return "<p>Expense Tracker API</p>"
+         "<div><a href='/summary'>View All Summaries</a></div>"
+         "<div><a href='/expenses/08_2025'>View Expenses for August 2025 (example)</a></div>"
+         "<div><a href='/register'>Register</a></div>"
+         "<div><a href='/login'>Login</a></div>"; });
+
+  CROW_ROUTE(app, "/register").methods(crow::HTTPMethod::POST)([](const crow::request& req) {
+      auto b = crow::json::load(req.body);
+      if (!b || !b.has("username") || !b.has("password")) {
+        return crow::response(400, "{\"error\": \"Missing username or password\"}");
+      }
+      std::string u = b["username"].s();
+      std::string p = b["password"].s();
+      if (register_user(u, p)) {
+        return crow::response(200, "{\"ok\": true, \"message\": \"User registered successfully\"}");
+      }
+      return crow::response(400, "{\"error\": \"Registration failed - username may be taken or invalid\"}");
   });
 
-  CROW_ROUTE(app, "/summary").methods(crow::HTTPMethod::Get)([&db_ptr]() {
+  CROW_ROUTE(app, "/login").methods(crow::HTTPMethod::POST)([](const crow::request& req) {
+      auto b = crow::json::load(req.body);
+      if (!b || !b.has("username") || !b.has("password")) {
+        return crow::response(400, "{\"error\": \"Missing username or password\"}");
+      }
+      std::string u = b["username"].s();
+      std::string p = b["password"].s();
+      int user_id = verify_login(u, p);
+      if (user_id < 0) {
+        return crow::response(401, "{\"error\": \"Invalid credentials\"}");
+      }
+      
+      std::string token = generate_session_token();
+      time_t expiry = std::time(nullptr) + SESSION_EXPIRE_SECONDS;
+      {
+        std::lock_guard<std::mutex> lock(sessions_mutex);
+        sessions[token] = {user_id, expiry};
+      }
+      
+      crow::response res(200, "{\"user_id\": " + std::to_string(user_id) + ", \"username\": \"" + u + "\", \"expires_in\": " + std::to_string(SESSION_EXPIRE_SECONDS) + "}");
+      res.add_header("Set-Cookie", "session=" + token + "; Path=/; HttpOnly");
+      return res;
+  });
+
+  CROW_ROUTE(app, "/logout").methods(crow::HTTPMethod::POST)([](const crow::request& req) {
+      std::string cookies = req.get_header_value("cookie");
+      size_t pos = cookies.find("session=");
+      if (pos != std::string::npos) {
+          pos += 8;
+          size_t end = cookies.find(";", pos);
+          if (end == std::string::npos) end = cookies.length();
+          std::string token = cookies.substr(pos, end - pos);
+          std::lock_guard<std::mutex> lock(sessions_mutex);
+          sessions.erase(token);
+      }
+      crow::response res(200, "{\"ok\": true}");
+      res.add_header("Set-Cookie", "session=; Path=/; Max-Age=0");
+      return res;
+  });
+
+  CROW_ROUTE(app, "/me").methods(crow::HTTPMethod::GET)([](const crow::request& req) {
+      int user_id = get_session_user_id(req);
+      if (user_id < 0) {
+        return crow::response(401, "{\"error\": \"Unauthorized\"}");
+      }
+      
+      sqlite3_stmt* stmt;
+      if (sqlite3_prepare_v2(auth_db, "SELECT username FROM users WHERE id = ?", -1, &stmt, nullptr) != SQLITE_OK) {
+        return crow::response(500, "{\"error\": \"Database error\"}");
+      }
+      sqlite3_bind_int(stmt, 1, user_id);
+      std::string username;
+      if (sqlite3_step(stmt) == SQLITE_ROW) {
+        username = (const char*)sqlite3_column_text(stmt, 0);
+      }
+      sqlite3_finalize(stmt);
+      
+      return crow::response(200, "{\"user_id\": " + std::to_string(user_id) + ", \"username\": \"" + username + "\"}");
+  });
+
+  CROW_ROUTE(app, "/summary").methods(crow::HTTPMethod::Get)([&db_ptr](const crow::request& req) {
+    int user_id = get_session_user_id(req);
+    if (user_id < 0) return crow::response(401, "{\"error\": \"Unauthorized\"}");
+    
     auto summaries = db_ptr->getAllSummaries();
     crow::json::wvalue response;
     for (size_t i = 0; i < summaries.size(); ++i) {
