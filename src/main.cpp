@@ -14,6 +14,71 @@
 #include <mutex>
 #include <iostream>
 
+extern std::map<std::string, std::pair<int, time_t>> sessions;
+extern std::mutex sessions_mutex;
+
+struct AuthMiddleware {
+    struct context {
+        int user_id = -1;
+    };
+
+    static std::string get_cookie(const crow::request& req, const std::string& name) {
+        std::string cookies = req.get_header_value("cookie");
+        if (cookies.empty()) return "";
+        
+        size_t pos = cookies.find(name + "=");
+        if (pos == std::string::npos) return "";
+        pos += name.length() + 1;
+        size_t end = cookies.find(";", pos);
+        if (end == std::string::npos) end = cookies.length();
+        return cookies.substr(pos, end - pos);
+    }
+
+    static bool is_public_route(const std::string& path) {
+        return path == "/" || 
+               path == "/register" || 
+               path == "/login" || 
+               path == "/logout";
+    }
+
+    void before_handle(crow::request& req, crow::response& res, context& ctx) {
+        if (is_public_route(req.url)) {
+            return;
+        }
+        
+        std::string token = get_cookie(req, "session");
+        if (token.empty()) {
+            res.code = 401;
+            res.body = "{\"error\": \"Unauthorized\"}";
+            res.set_header("Content-Type", "application/json");
+            return;
+        }
+        
+        std::lock_guard<std::mutex> lock(sessions_mutex);
+        auto it = sessions.find(token);
+        if (it == sessions.end()) {
+            res.code = 401;
+            res.body = "{\"error\": \"Unauthorized\"}";
+            res.set_header("Content-Type", "application/json");
+            return;
+        }
+        
+        time_t now = std::time(nullptr);
+        if (now > it->second.second) {
+            sessions.erase(token);
+            res.code = 401;
+            res.body = "{\"error\": \"Session expired\"}";
+            res.set_header("Content-Type", "application/json");
+            return;
+        }
+        
+        ctx.user_id = it->second.first;
+    }
+
+    void after_handle(crow::request& req, crow::response& res, context& ctx) {
+    }
+};
+
 sqlite3* auth_db;
 
 const int SESSION_EXPIRE_SECONDS = 3600;
@@ -145,7 +210,7 @@ int main() {
 
   auto db_ptr = std::make_shared<FinanceDB>("Main.db", "Detailed.db");
 
-  crow::App<crow::CORSHandler> app;
+  crow::App<crow::CORSHandler, AuthMiddleware> app;
 
   CROW_ROUTE(app, "/")([]{ return "<p>Expense Tracker API</p>"
          "<div><a href='/summary'>View All Summaries</a></div>"
