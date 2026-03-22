@@ -2,30 +2,6 @@
 
 This project consists of a C++ backend for managing personal finance data (using Crow C++ web framework and SQLite3) and a simple HTML/Tailwind CSS/JavaScript frontend for interaction.
 
-## Project Structure
-
-```
-expense/
-├── CMakeLists.txt          # CMake build configuration
-├── README.md               # This file
-├── study.md               # Study notes
-├── todo.md                # Todo list
-├── .gitignore             # Git ignore rules
-├── backend_server.py      # Python Flask server for frontend
-├── run.sh                # Quick start script (in scripts/)
-├── sciplot/              # Third-party plotting library (header-only)
-├── frontend/             # HTML/Tailwind CSS frontend
-│   └── index.html
-├── src/                  # C++ source files
-│   ├── main.cpp          # Main entry point and API routes
-│   ├── FinanceDB.cpp     # Database operations
-│   └── helper.cpp        # Helper utilities
-├── include/              # Header files
-│   ├── FinanceDB.h       # Database class declarations
-│   └── helper.h          # Helper function declarations
-└── build/                # Build output directory (created by CMake)
-```
-
 ## Directory Descriptions
 
 - **`src/`**: Contains all C++ source files (.cpp). This is where the main application logic lives.
