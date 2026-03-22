@@ -8,7 +8,10 @@
 </head>
 <body class="bg-gray-100 p-6">
     <div class="container mx-auto bg-white p-8 rounded-lg shadow-md">
-        <h1 class="text-3xl font-bold mb-6 text-center">Expense Tracker</h1>
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-center">Expense Tracker</h1>
+            <button id="logoutBtn" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">Logout</button>
+        </div>
 
         <!-- Add Expense Form -->
         <div class="mb-8 p-4 border rounded-lg bg-gray-50">
@@ -175,6 +178,34 @@
         const API_BASE_URL = 'http://localhost:5000'; // C++ backend runs on port 5000
         let existingCategories = new Set();
 
+        async function checkAuth() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/me`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    window.location.href = '/login';
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                window.location.href = '/login';
+                return false;
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch(`${API_BASE_URL}/logout`, { 
+                    method: 'POST',
+                    credentials: 'include'
+                });
+            } catch (e) {
+                console.error('Logout error:', e);
+            }
+            window.location.href = '/login';
+        }
+
         function getCurrentMonthYear() {
             const date = new Date();
             const month = (date.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
@@ -184,7 +215,9 @@
 
         async function fetchCategories() {
             try {
-                const response = await fetch(`${API_BASE_URL}/categories`);
+                const response = await fetch(`${API_BASE_URL}/categories`, {
+                    credentials: 'include'
+                });
                 if (response.ok) {
                     const categories = await response.json();
                     updateCategoryDropdown(categories);
@@ -243,9 +276,15 @@
             return ''; // Invalid format
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            const isAuthenticated = await checkAuth();
+            if (!isAuthenticated) return;
+
             fetchExpenses(); // Initial load of current month's expenses
             fetchCategories(); // Load categories from backend
+
+            // Logout button handler
+            document.getElementById('logoutBtn').addEventListener('click', logout);
 
             // Category dropdown change handler
             document.getElementById('categorySelect').addEventListener('change', function() {
@@ -280,6 +319,7 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'include',
                         body: JSON.stringify({ 
                             spentOn: description, 
                             price: amount,
@@ -320,6 +360,7 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'include',
                         body: JSON.stringify({ salary, limit }),
                     });
 
@@ -358,7 +399,9 @@
                 }
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/range/${formattedStartDate}/${formattedEndDate}`);
+                    const response = await fetch(`${API_BASE_URL}/range/${formattedStartDate}/${formattedEndDate}`, {
+                        credentials: 'include'
+                    });
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -376,7 +419,9 @@
                 const sortOrder = document.getElementById('sortOrder').value; // 'true' for ASC, 'false' for DESC
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/sorted_by_price/${sortOrder}`);
+                    const response = await fetch(`${API_BASE_URL}/sorted_by_price/${sortOrder}`, {
+                        credentials: 'include'
+                    });
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -399,7 +444,9 @@
                 // Get category of expense being deleted
                 let deletedCategory = null;
                 try {
-                    const response = await fetch(`${API_BASE_URL}/expenses/${getCurrentMonthYear()}`);
+                    const response = await fetch(`${API_BASE_URL}/expenses/${getCurrentMonthYear()}`, {
+                        credentials: 'include'
+                    });
                     if (response.ok) {
                         const expenses = await response.json();
                         const expenseToDelete = expenses.find(e => e.id === id);
@@ -414,6 +461,7 @@
                 try {
                     const response = await fetch(`${API_BASE_URL}/delete_expense/${id}`, {
                         method: 'DELETE',
+                        credentials: 'include'
                     });
 
                     if (!response.ok) {
@@ -462,6 +510,7 @@
                         headers: {
                             'Content-Type': 'application/json',
                         },
+                        credentials: 'include',
                         body: JSON.stringify(updateData),
                     });
 
@@ -490,7 +539,9 @@
                 outputDiv.innerHTML = '<p class="text-gray-500">Loading graph...</p>';
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/graph/yearly/${year}`);
+                    const response = await fetch(`${API_BASE_URL}/graph/yearly/${year}`, {
+                        credentials: 'include'
+                    });
                     if (!response.ok) {
                         throw new Error(`HTTP error! status: ${response.status}`);
                     }
@@ -517,7 +568,9 @@
             const currentMonthYear = getCurrentMonthYear();
 
             try {
-                const response = await fetch(`${API_BASE_URL}/expenses/${currentMonthYear}`);
+                const response = await fetch(`${API_BASE_URL}/expenses/${currentMonthYear}`, {
+                    credentials: 'include'
+                });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -548,7 +601,9 @@
             const currentMonthYear = getCurrentMonthYear();
 
             try {
-                const response = await fetch(`${API_BASE_URL}/expenses/${currentMonthYear}`);
+                const response = await fetch(`${API_BASE_URL}/expenses/${currentMonthYear}`, {
+                    credentials: 'include'
+                });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -564,7 +619,9 @@
             const outputDiv = document.getElementById('monthlySummariesOutput');
             outputDiv.innerHTML = '<p class="text-gray-500">Loading summaries...</p>';
             try {
-                const response = await fetch(`${API_BASE_URL}/summary`);
+                const response = await fetch(`${API_BASE_URL}/summary`, {
+                    credentials: 'include'
+                });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -592,7 +649,9 @@
             const outputDiv = document.getElementById('highestPriorityOutput');
             outputDiv.innerHTML = '<p class="text-gray-500">Loading highest priority expenses...</p>';
             try {
-                const response = await fetch(`${API_BASE_URL}/highest`);
+                const response = await fetch(`${API_BASE_URL}/highest`, {
+                    credentials: 'include'
+                });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
@@ -618,7 +677,9 @@
             const outputDiv = document.getElementById('totalSpentOutput');
             outputDiv.innerHTML = '<p class="text-gray-500">Calculating total spent...</p>';
             try {
-                const response = await fetch(`${API_BASE_URL}/total_spent`);
+                const response = await fetch(`${API_BASE_URL}/total_spent`, {
+                    credentials: 'include'
+                });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }

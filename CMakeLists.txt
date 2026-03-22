@@ -14,17 +14,6 @@ set(THIRD_PARTY_DIR ${CMAKE_SOURCE_DIR}/third_party)
 # Find SQLite3
 find_package(SQLite3 REQUIRED)
 
-# Find Crow (single header version crow_all.h)
-find_path(
-  CROW_INCLUDE_DIR crow_all.h
-  HINTS ENV CROW_DIR ENV CROW_ROOT
-  PATH_SUFFIXES include see)
-if(NOT CROW_INCLUDE_DIR)
-  message(
-    FATAL_ERROR
-      "Crow headers not found. Please set CROW_DIR or CROW_ROOT environment variable.")
-endif()
-
 # Gather all source files from src/ directory
 file(GLOB SOURCES ${SOURCE_DIR}/*.cpp)
 
@@ -37,7 +26,6 @@ target_link_libraries(expense sqlite3 pthread sodium)
 # Add include directories
 target_include_directories(expense PRIVATE ${INCLUDE_DIR})
 target_include_directories(expense PRIVATE ${THIRD_PARTY_DIR})
-target_include_directories(expense PRIVATE ${CROW_INCLUDE_DIR})
 target_include_directories(expense PRIVATE ${CMAKE_SOURCE_DIR}/sciplot)
 
 # If Crow requires specific compiler definitions (e.g., for

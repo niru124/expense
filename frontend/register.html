@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Expense Tracker</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h1 class="text-3xl font-bold mb-6 text-center text-indigo-600">Register</h1>
+        
+        <form id="registerForm" class="space-y-4">
+            <div>
+                <label for="username" class="block text-sm font-medium text-gray-700">Username</label>
+                <input type="text" id="username" name="username" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                <input type="password" id="password" name="password" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div>
+                <label for="confirmPassword" class="block text-sm font-medium text-gray-700">Confirm Password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" required>
+            </div>
+            <div id="errorMessage" class="text-red-600 text-sm hidden"></div>
+            <div id="successMessage" class="text-green-600 text-sm hidden"></div>
+            <button type="submit" class="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Register</button>
+        </form>
+        
+        <p class="mt-4 text-center text-gray-600">
+            Already have an account? 
+            <a href="http://localhost:8088/login.html" class="text-indigo-600 hover:underline">Login here</a>
+        </p>
+        
+        <p class="mt-2 text-center">
+            <a href="http://localhost:8088/" class="text-gray-500 hover:underline">Back to Home</a>
+        </p>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:5000';
+
+        document.getElementById('registerForm').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+            
+            if (password !== confirmPassword) {
+                errorMessage.textContent = 'Passwords do not match';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            
+            if (password.length < 3) {
+                errorMessage.textContent = 'Password must be at least 3 characters';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ username, password }),
+                });
+                
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    errorMessage.textContent = result.error || 'Registration failed';
+                    errorMessage.classList.remove('hidden');
+                    return;
+                }
+                
+                // Registration successful
+                successMessage.textContent = 'Registration successful! Redirecting to login...';
+                successMessage.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    window.location.href = 'http://localhost:8088/login.html';
+                }, 1500);
+            } catch (error) {
+                console.error('Error:', error);
+                errorMessage.textContent = 'Unable to connect to server. Make sure the backend is running.';
+                errorMessage.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

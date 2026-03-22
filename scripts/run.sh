@@ -29,22 +29,26 @@ if [ $? -ne 0 ]; then
 fi
 
 # 2. Start the C++ backend in the background
-echo "Starting C++ backend..."
-./build/expense &
+echo "Starting C++ backend on port 5000..."
+cd "$PROJECT_DIR/build"
+./expense &
 CPP_PID=$!
 echo "C++ backend running with PID: $CPP_PID"
 
 # Give the C++ backend a moment to start up
 sleep 2
 
-# 3. Start the Python frontend server in the background
-echo "Starting Python frontend server..."
+# 3. Start the Flask frontend server in the background
+echo "Starting Flask frontend server on port 8000..."
+cd "$PROJECT_DIR"
 python3 backend_server.py &
 PYTHON_PID=$!
-echo "Python frontend server running with PID: $PYTHON_PID"
+echo "Flask frontend server running with PID: $PYTHON_PID"
 
 echo ""
-echo "Frontend is now accessible at: http://localhost:8000"
+echo "Frontend: http://localhost:8088"
+echo "Backend API: http://localhost:5000"
+echo ""
 echo "Press Ctrl+C to stop both servers."
 
 # Keep the script running so background processes don't exit immediately

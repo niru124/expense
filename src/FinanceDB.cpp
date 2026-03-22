@@ -255,6 +255,7 @@ std::vector<ExpenseRecord> FinanceDB::getItemByDateRange(std::string item, std::
         sqlite3_bind_text(stmt, 1, itemPattern.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 2, start_date.c_str(), -1, SQLITE_STATIC);
         sqlite3_bind_text(stmt, 3, end_date.c_str(), -1, SQLITE_STATIC);
+        // ouput formatting
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             ExpenseRecord e;
             e.id = sqlite3_column_int(stmt, 0);

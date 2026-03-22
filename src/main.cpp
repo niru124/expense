@@ -211,14 +211,17 @@ int main() {
   auto db_ptr = std::make_shared<FinanceDB>("Main.db", "Detailed.db");
 
   crow::App<crow::CORSHandler, AuthMiddleware> app;
+  
+  app.get_middleware<crow::CORSHandler>().global().allow_credentials();
 
   CROW_ROUTE(app, "/")([]{ return "<p>Expense Tracker API</p>"
          "<div><a href='/summary'>View All Summaries</a></div>"
          "<div><a href='/expenses/08_2025'>View Expenses for August 2025 (example)</a></div>"
          "<div><a href='/register'>Register</a></div>"
-         "<div><a href='/login'>Login</a></div>"; });
+         "<div><a href='/login'>Login</a></div>"
+         "<div><a href='http://localhost:8088'>Go to Frontend App</a></div>"; });
 
-  CROW_ROUTE(app, "/register").methods(crow::HTTPMethod::POST)([](const crow::request& req) {
+  CROW_ROUTE(app, "/register").methods(crow::HTTPMethod::Post)([](const crow::request& req) {
       auto b = crow::json::load(req.body);
       if (!b || !b.has("username") || !b.has("password")) {
         return crow::response(400, "{\"error\": \"Missing username or password\"}");
