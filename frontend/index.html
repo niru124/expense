@@ -38,6 +38,23 @@
                     <label for="newCategory" class="block text-sm font-medium text-gray-700">New Category Name</label>
                     <input type="text" id="newCategory" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter new category name">
                 </div>
+                <div>
+                    <label for="modeOfPaymentSelect" class="block text-sm font-medium text-gray-700">Mode of Payment (Optional)</label>
+                    <div class="flex gap-2">
+                        <select id="modeOfPaymentSelect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="">-- No Mode --</option>
+                            <option value="new">+ Create New Mode</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="newModeOfPaymentDiv" class="hidden">
+                    <label for="newModeOfPayment" class="block text-sm font-medium text-gray-700">New Mode of Payment</label>
+                    <input type="text" id="newModeOfPayment" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter new mode of payment">
+                </div>
+                <div>
+                    <label for="expenseDate" class="block text-sm font-medium text-gray-700">Date (Optional)</label>
+                    <input type="date" id="expenseDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
                 <button type="submit" class="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Add Expense</button>
             </form>
         </div>
@@ -80,12 +97,12 @@
             <h2 class="text-2xl font-semibold mb-4">Expenses by Date Range</h2>
             <form id="fetchRangeForm" class="space-y-4 mb-4">
                 <div>
-                    <label for="startDate" class="block text-sm font-medium text-gray-700">Start Date (DD-MM-YYYY)</label>
-                    <input type="text" id="startDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 01-10-2025" required>
+                    <label for="startDate" class="block text-sm font-medium text-gray-700">Start Date</label>
+                    <input type="date" id="startDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
                 </div>
                 <div>
-                    <label for="endDate" class="block text-sm font-medium text-gray-700">End Date (DD-MM-YYYY)</label>
-                    <input type="text" id="endDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., 31-10-2025" required>
+                    <label for="endDate" class="block text-sm font-medium text-gray-700">End Date</label>
+                    <input type="date" id="endDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" required>
                 </div>
                 <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Fetch Expenses by Range</button>
             </form>
@@ -147,6 +164,14 @@
                 <div>
                     <label for="editCategory" class="block text-sm font-medium text-gray-700">New Category (Optional)</label>
                     <input type="text" id="editCategory" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Leave empty to keep current category">
+                </div>
+                <div>
+                    <label for="editModeOfPayment" class="block text-sm font-medium text-gray-700">New Mode of Payment (Optional)</label>
+                    <input type="text" id="editModeOfPayment" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Leave empty to keep current mode">
+                </div>
+                <div>
+                    <label for="editDate" class="block text-sm font-medium text-gray-700">New Date (Optional)</label>
+                    <input type="date" id="editDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm">
                 </div>
                 <div>
                     <label for="editPriority" class="block text-sm font-medium text-gray-700">New Priority (Optional)</label>
@@ -257,6 +282,46 @@
             }
         }
 
+        async function fetchModeOfPayment() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/mode_of_payment`, {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const modes = await response.json();
+                    updateModeOfPaymentDropdown(modes);
+                }
+            } catch (error) {
+                console.error('Error fetching mode of payment:', error);
+            }
+        }
+
+        function updateModeOfPaymentDropdown(modes) {
+            const select = document.getElementById('modeOfPaymentSelect');
+            const currentValue = select.value;
+            
+            const hasNewOption = select.querySelector('option[value="new"]');
+            
+            while (select.options.length > 2) {
+                select.remove(2);
+            }
+            
+            modes.forEach(mode => {
+                if (mode && mode.trim()) {
+                    const option = document.createElement('option');
+                    option.value = mode;
+                    option.textContent = mode;
+                    select.appendChild(option);
+                }
+            });
+            
+            if (modes.includes(currentValue)) {
+                select.value = currentValue;
+            } else {
+                select.value = "";
+            }
+        }
+
         function collectAllCategories() {
             const categories = new Set();
             const categoryBadges = document.querySelectorAll('#expensesList .category-badge');
@@ -282,6 +347,7 @@
 
             fetchExpenses(); // Initial load of current month's expenses
             fetchCategories(); // Load categories from backend
+            fetchModeOfPayment(); // Load mode of payment from backend
 
             // Logout button handler
             document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -297,6 +363,17 @@
                 }
             });
 
+            // Mode of payment dropdown change handler
+            document.getElementById('modeOfPaymentSelect').addEventListener('change', function() {
+                const newModeDiv = document.getElementById('newModeOfPaymentDiv');
+                if (this.value === 'new') {
+                    newModeDiv.classList.remove('hidden');
+                    document.getElementById('newModeOfPayment').focus();
+                } else {
+                    newModeDiv.classList.add('hidden');
+                }
+            });
+
             // Add Expense Form
             document.getElementById('addExpenseForm').addEventListener('submit', async (event) => {
                 event.preventDefault();
@@ -309,11 +386,40 @@
                 
                 if (categorySelect === 'new' && newCategoryInput) {
                     category = newCategoryInput;
+                    await fetch(`${API_BASE_URL}/add_category`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ category })
+                    });
                 } else if (categorySelect && categorySelect !== 'new') {
                     category = categorySelect;
                 }
 
+                let modeOfPayment = null;
+                const modeSelect = document.getElementById('modeOfPaymentSelect').value;
+                const newModeInput = document.getElementById('newModeOfPayment').value.trim();
+                
+                if (modeSelect === 'new' && newModeInput) {
+                    modeOfPayment = newModeInput;
+                    await fetch(`${API_BASE_URL}/add_mode_of_payment`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({ modeOfPayment })
+                    });
+                } else if (modeSelect && modeSelect !== 'new') {
+                    modeOfPayment = modeSelect;
+                }
+
                 try {
+                    const dateInput = document.getElementById('expenseDate').value;
+                    let date = null;
+                    if (dateInput) {
+                        const parts = dateInput.split('-');
+                        date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    }
+
                     const response = await fetch(`${API_BASE_URL}/expense`, {
                         method: 'POST',
                         headers: {
@@ -323,7 +429,9 @@
                         body: JSON.stringify({ 
                             spentOn: description, 
                             price: amount,
-                            ...(category && { category })
+                            ...(category && { category }),
+                            ...(modeOfPayment && { modeOfPayment }),
+                            ...(date && { date })
                         }),
                     });
 
@@ -337,11 +445,16 @@
                     document.getElementById('amount').value = '';
                     document.getElementById('categorySelect').value = '';
                     document.getElementById('newCategory').value = '';
+                    document.getElementById('modeOfPaymentSelect').value = '';
+                    document.getElementById('newModeOfPayment').value = '';
+                    document.getElementById('expenseDate').value = '';
                     document.getElementById('newCategoryDiv').classList.add('hidden');
+                    document.getElementById('newModeOfPaymentDiv').classList.add('hidden');
                     fetchExpenses(); // Refresh the list
                     
-                    // Refresh categories from backend (this will add the new category if it was created)
+                    // Refresh categories and mode of payment from backend
                     fetchCategories();
+                    fetchModeOfPayment();
                 } catch (error) {
                     console.error('Error adding expense:', error);
                     alert('Failed to add expense. Check console for details.');
@@ -390,13 +503,13 @@
                 const startDate = document.getElementById('startDate').value;
                 const endDate = document.getElementById('endDate').value;
 
-                const formattedStartDate = formatDateForBackend(startDate);
-                const formattedEndDate = formatDateForBackend(endDate);
-
-                if (!formattedStartDate || !formattedEndDate) {
-                    document.getElementById('rangeExpensesOutput').innerHTML = `<p class="text-red-600">Invalid date format. Use DD-MM-YYYY.</p>`;
+                if (!startDate || !endDate) {
+                    document.getElementById('rangeExpensesOutput').innerHTML = `<p class="text-red-600">Please select both dates.</p>`;
                     return;
                 }
+
+                const formattedStartDate = formatDateForBackend(startDate);
+                const formattedEndDate = formatDateForBackend(endDate);
 
                 try {
                     const response = await fetch(`${API_BASE_URL}/range/${formattedStartDate}/${formattedEndDate}`, {
@@ -491,12 +604,19 @@
                 const spentOn = document.getElementById('editSpentOn').value;
                 const price = document.getElementById('editPrice').value;
                 const category = document.getElementById('editCategory').value;
+                const modeOfPayment = document.getElementById('editModeOfPayment').value;
+                const date = document.getElementById('editDate').value;
                 const priority = document.getElementById('editPriority').value;
 
                 const updateData = {};
                 if (spentOn) updateData.spentOn = spentOn;
                 if (price) updateData.price = parseFloat(price);
                 if (category) updateData.category = category;
+                if (modeOfPayment) updateData.modeOfPayment = modeOfPayment;
+                if (date) {
+                    const parts = date.split('-');
+                    updateData.date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
                 if (priority) updateData.priority = parseInt(priority);
 
                 if (Object.keys(updateData).length === 0) {
@@ -707,10 +827,17 @@
                 const categoryDisplay = expense.category && expense.category.trim() 
                     ? `<span class="category-badge text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded ml-2">Category: ${expense.category}</span>` 
                     : '';
+                const modeOfPaymentDisplay = expense.mode_of_payment && expense.mode_of_payment.trim()
+                    ? `<span class="mode-badge text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded ml-2">Mode: ${expense.mode_of_payment}</span>`
+                    : '';
                 expenseItem.innerHTML = `
-                    <div class="flex items-center">
-                        <span class="text-lg font-medium">${expense.spent_on}${idDisplay}</span>
-                        ${categoryDisplay}
+                    <div class="flex flex-col">
+                        <div class="flex items-center">
+                            <span class="text-lg font-medium">${expense.spent_on}${idDisplay}</span>
+                            ${categoryDisplay}
+                            ${modeOfPaymentDisplay}
+                        </div>
+                        <span class="text-sm text-gray-500">${expense.day_month_year || ''}</span>
                     </div>
                     <span class="text-lg font-bold text-green-600">$${expense.price.toFixed(2)}</span>
                 `;

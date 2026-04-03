@@ -23,6 +23,7 @@ struct ExpenseRecord {
   std::string spent_on;
   double price;
   std::string category;
+  std::string mode_of_payment;
   int priority;
 };
 
@@ -47,8 +48,14 @@ public:
 
   // --- Methods for Adding Data ---
   bool addOrUpdateMonthlySummary(double salary, double limit);
-  bool addExpense(const std::string &spentOn, double price, const std::optional<std::string> &category = std::nullopt);
+  bool addExpense(const std::string &spentOn, double price, const std::optional<std::string> &category = std::nullopt, const std::optional<std::string> &date = std::nullopt, const std::optional<std::string> &modeOfPayment = std::nullopt);
   void updatePriority(const std::string &spentOn);
+
+  // --- Methods for Categories and Mode of Payment ---
+  std::vector<std::string> getAllCategories();
+  bool addCategory(const std::string &category);
+  std::vector<std::string> getAllModeOfPayment();
+  bool addModeOfPayment(const std::string &modeOfPayment);
 
   // --- Methods for Viewing Data ---
   std::vector<MonthlySummary> getAllSummaries();
@@ -66,6 +73,13 @@ public:
 
   bool updateSelected2(int id, const std::optional<std::string> &spentOn,
                       const std::optional<double> &price,
+                      const std::optional<int> &priority);
+
+  bool updateSelected3(int id, const std::optional<std::string> &spentOn,
+                      const std::optional<double> &price,
+                      const std::optional<std::string> &category,
+                      const std::optional<std::string> &modeOfPayment,
+                      const std::optional<std::string> &date,
                       const std::optional<int> &priority);
 };
 

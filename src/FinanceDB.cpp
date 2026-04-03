@@ -79,6 +79,16 @@ void FinanceDB::initMainDB() {
                       "SavingPercentage REAL,"
                       "Condition TEXT);";
     executeSQL(mainDB, sql);
+
+    sql = "CREATE TABLE IF NOT EXISTS Categories ("
+          "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+          "name TEXT UNIQUE NOT NULL);";
+    executeSQL(mainDB, sql);
+
+    sql = "CREATE TABLE IF NOT EXISTS ModeOfPayment ("
+          "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+          "name TEXT UNIQUE NOT NULL);";
+    executeSQL(mainDB, sql);
 }
 
 void FinanceDB::initDetailedDB() {
@@ -87,7 +97,11 @@ void FinanceDB::initDetailedDB() {
                       "SpentOn TEXT NOT NULL,"
                       "Price REAL NOT NULL,"
                       "Category TEXT,"
+                      "ModeOfPayment TEXT,"
                       "Priority INTEGER DEFAULT 0);";
+    executeSQL(detailedDB, sql);
+
+    sql = "ALTER TABLE " + currentTableName + " ADD COLUMN ModeOfPayment TEXT;";
     executeSQL(detailedDB, sql);
 }
 
@@ -149,10 +163,17 @@ bool FinanceDB::addOrUpdateMonthlySummary(double salary, double limit) {
     return true;
 }
 
-bool FinanceDB::addExpense(const std::string& spentOn, double price, const std::optional<std::string>& category) {
+bool FinanceDB::addExpense(const std::string& spentOn, double price, const std::optional<std::string>& category, const std::optional<std::string>& date, const std::optional<std::string>& modeOfPayment) {
     if (!detailedDB) return false;
 
-    std::string sql = "INSERT INTO " + currentTableName + " (day_month_year, SpentOn, Price, Category, Priority) VALUES (?, ?, ?, ?, 0);";
+    std::string dayMonthYear;
+    if (date && !date->empty()) {
+        dayMonthYear = *date;
+    } else {
+        dayMonthYear = getCurrentDayMonthYear();
+    }
+    
+    std::string sql = "INSERT INTO " + currentTableName + " (day_month_year, SpentOn, Price, Category, ModeOfPayment, Priority) VALUES (?, ?, ?, ?, ?, 0);";
     
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
@@ -160,7 +181,7 @@ bool FinanceDB::addExpense(const std::string& spentOn, double price, const std::
         return false;
     }
 
-    std::string uniqueDayKey = getCurrentDayMonthYear() + "_" + std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count());
+    std::string uniqueDayKey = dayMonthYear + "_" + std::to_string(std::chrono::high_resolution_clock::now().time_since_epoch().count());
     // This prevents issues if the string is temporary. Contrast with SQLITE_STATIC, which assumes the string is persistent and doesn't copy. Use TRANSIENT for local or changing strings. (like pass by value)
 
     sqlite3_bind_text(stmt, 1, uniqueDayKey.c_str(), -1, SQLITE_TRANSIENT);
@@ -171,6 +192,12 @@ bool FinanceDB::addExpense(const std::string& spentOn, double price, const std::
         sqlite3_bind_text(stmt, 4, category->c_str(), -1, SQLITE_STATIC);
     } else {
         sqlite3_bind_null(stmt, 4);
+    }
+
+    if (modeOfPayment && !modeOfPayment->empty()) {
+        sqlite3_bind_text(stmt, 5, modeOfPayment->c_str(), -1, SQLITE_STATIC);
+    } else {
+        sqlite3_bind_null(stmt, 5);
     }
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
@@ -222,7 +249,7 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
 
     //     reinterpret_cast<const char*> is used because unsigned char* and char* are unrelated pointer types, requiring a low-level reinterpretation of the pointer bits. static_cast doesn't work for unrelated pointers. dynamic_cast is for polymorphic classes, not applicable here. const_cast removes const, but doesn't change types. A C-style cast (const char*) would work but is less safe and explicit. reinterpret_cast is the correct, standard choice for this conversion.
 
-    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, ModeOfPayment, Priority FROM "+currentTableName+" WHERE day_month_year BETWEEN ? AND ?";
 
     sqlite3_stmt* stmt;
 
@@ -236,7 +263,8 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
             e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-            e.priority = sqlite3_column_int(stmt, 5);
+            e.mode_of_payment = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            e.priority = sqlite3_column_int(stmt, 6);
             summaries.push_back(e);
         }
     } else {
@@ -248,7 +276,7 @@ std::vector<ExpenseRecord> FinanceDB::getRangeOfDate(std::string start_date,std:
 
 std::vector<ExpenseRecord> FinanceDB::getItemByDateRange(std::string item, std::string start_date, std::string end_date){
     std::vector<ExpenseRecord>summaries;
-    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM "+currentTableName+" WHERE SpentOn LIKE ? AND day_month_year BETWEEN ? AND ?";
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, ModeOfPayment, Priority FROM "+currentTableName+" WHERE SpentOn LIKE ? AND day_month_year BETWEEN ? AND ?";
     sqlite3_stmt* stmt;
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
         std::string itemPattern = "%" + item + "%";
@@ -263,7 +291,8 @@ std::vector<ExpenseRecord> FinanceDB::getItemByDateRange(std::string item, std::
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
             e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-            e.priority = sqlite3_column_int(stmt, 5);
+            e.mode_of_payment = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            e.priority = sqlite3_column_int(stmt, 6);
             summaries.push_back(e);
         }
     } else {
@@ -299,7 +328,7 @@ std::map<std::string, double> FinanceDB::getMonthlyTotalsForYear(int year){
 std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){
     std::vector<ExpenseRecord>summaries; 
     std::string ordering=(order)?"ASC":"DESC";
-    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
+    std::string sql="SELECT rowid, day_month_year, SpentOn, Price, Category, ModeOfPayment, Priority FROM "+currentTableName+" ORDER BY Price "+ordering;
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -310,7 +339,8 @@ std::vector<ExpenseRecord> FinanceDB::calcSortByPrice(bool order){
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
             e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-            e.priority = sqlite3_column_int(stmt, 5);
+            e.mode_of_payment = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            e.priority = sqlite3_column_int(stmt, 6);
             summaries.push_back(e);
         }
     }
@@ -340,7 +370,7 @@ std::vector<MonthlySummary> FinanceDB::getAllSummaries() {
 
 std::vector<ExpenseRecord> FinanceDB::getSortedByVal() {
     std::vector<ExpenseRecord> summaries;
-    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM " + currentTableName + " ORDER BY Price DESC;";
+    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Category, ModeOfPayment, Priority FROM " + currentTableName + " ORDER BY Price DESC;";
     sqlite3_stmt* stmt;
 
     if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
@@ -351,7 +381,8 @@ std::vector<ExpenseRecord> FinanceDB::getSortedByVal() {
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
             e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-            e.priority = sqlite3_column_int(stmt, 5);
+            e.mode_of_payment = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            e.priority = sqlite3_column_int(stmt, 6);
             summaries.push_back(e);
         }
     }
@@ -385,7 +416,7 @@ std::vector<ExpenseRecord> FinanceDB::calcPriority() {
 std::vector<ExpenseRecord> FinanceDB::getExpensesForMonth(const std::string& monthYear) {
     std::vector<ExpenseRecord> expenses;
     std::string tableName = "expenses_" + monthYear;
-    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Category, Priority FROM " + tableName + ";";
+    std::string sql = "SELECT rowid, day_month_year, SpentOn, Price, Category, ModeOfPayment, Priority FROM " + tableName + ";";
     sqlite3_stmt* stmt;
 
     // Check if the table exists by preparing the statement. If it fails, return empty.
@@ -397,7 +428,8 @@ std::vector<ExpenseRecord> FinanceDB::getExpensesForMonth(const std::string& mon
             e.spent_on = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 2));
             e.price = sqlite3_column_double(stmt, 3);
             e.category = sqlite3_column_type(stmt, 4) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
-            e.priority = sqlite3_column_int(stmt, 5);
+            e.mode_of_payment = sqlite3_column_type(stmt, 5) == SQLITE_NULL ? "" : reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+            e.priority = sqlite3_column_int(stmt, 6);
             expenses.push_back(e);
         }
     } else {
@@ -519,4 +551,146 @@ bool FinanceDB::updateSelected2(int id, const std::optional<std::string>& spentO
 
     sqlite3_finalize(stmt);
     return true;
+}
+
+bool FinanceDB::updateSelected3(int id, const std::optional<std::string>& spentOn,
+                               const std::optional<double>& price,
+                               const std::optional<std::string>& category,
+                               const std::optional<std::string>& modeOfPayment,
+                               const std::optional<std::string>& date,
+                               const std::optional<int>& priority) {
+    if (!detailedDB) return false;
+
+    std::vector<std::string> update_clauses;
+    std::vector<std::function<void(sqlite3_stmt*, int)>> binders;
+
+    if (spentOn) {
+        update_clauses.push_back("SpentOn = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_text(stmt, idx, spentOn->c_str(), -1, SQLITE_STATIC); });
+    }
+    if (price) {
+        update_clauses.push_back("Price = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_double(stmt, idx, *price); });
+    }
+    if (category) {
+        if (category->empty()) {
+            update_clauses.push_back("Category = NULL");
+        } else {
+            update_clauses.push_back("Category = ?");
+            binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_text(stmt, idx, category->c_str(), -1, SQLITE_STATIC); });
+        }
+    }
+    if (modeOfPayment) {
+        if (modeOfPayment->empty()) {
+            update_clauses.push_back("ModeOfPayment = NULL");
+        } else {
+            update_clauses.push_back("ModeOfPayment = ?");
+            binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_text(stmt, idx, modeOfPayment->c_str(), -1, SQLITE_STATIC); });
+        }
+    }
+    if (date) {
+        update_clauses.push_back("day_month_year = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_text(stmt, idx, date->c_str(), -1, SQLITE_STATIC); });
+    }
+    if (priority) {
+        update_clauses.push_back("Priority = ?");
+        binders.push_back([&](sqlite3_stmt* stmt, int idx) { sqlite3_bind_int(stmt, idx, *priority); });
+    }
+
+    if (update_clauses.empty()) {
+        std::cerr << "No fields provided for update for id: " << id << std::endl;
+        return false;
+    }
+
+    std::string set_clause;
+    for (size_t i = 0; i < update_clauses.size(); ++i) {
+        set_clause += update_clauses[i];
+        if (i < update_clauses.size() - 1) {
+            set_clause += ", ";
+        }
+    }
+
+    std::string sql = "UPDATE " + currentTableName + " SET " + set_clause + " WHERE rowid = ?;";
+    sqlite3_stmt* stmt = nullptr;
+
+    if (sqlite3_prepare_v2(detailedDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+        std::cerr << "Failed to prepare statement for updateSelected3: " << sqlite3_errmsg(detailedDB) << std::endl;
+        return false;
+    }
+
+    int param_index = 1;
+    for (const auto& binder : binders) {
+        binder(stmt, param_index++);
+    }
+
+    sqlite3_bind_int(stmt, param_index, id);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        std::cerr << "Execution failed for updateSelected3: " << sqlite3_errmsg(detailedDB) << std::endl;
+        sqlite3_finalize(stmt);
+        return false;
+    }
+
+    sqlite3_finalize(stmt);
+    return true;
+}
+
+std::vector<std::string> FinanceDB::getAllCategories() {
+    std::vector<std::string> categories;
+    if (!mainDB) return categories;
+
+    std::string sql = "SELECT name FROM Categories ORDER BY name;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(mainDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (name) categories.push_back(name);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return categories;
+}
+
+bool FinanceDB::addCategory(const std::string& category) {
+    if (!mainDB || category.empty()) return false;
+
+    std::string sql = "INSERT OR IGNORE INTO Categories (name) VALUES (?);";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(mainDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+        return false;
+    }
+    sqlite3_bind_text(stmt, 1, category.c_str(), -1, SQLITE_STATIC);
+    bool success = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return success;
+}
+
+std::vector<std::string> FinanceDB::getAllModeOfPayment() {
+    std::vector<std::string> modes;
+    if (!mainDB) return modes;
+
+    std::string sql = "SELECT name FROM ModeOfPayment ORDER BY name;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(mainDB, sql.c_str(), -1, &stmt, 0) == SQLITE_OK) {
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+            if (name) modes.push_back(name);
+        }
+    }
+    sqlite3_finalize(stmt);
+    return modes;
+}
+
+bool FinanceDB::addModeOfPayment(const std::string& modeOfPayment) {
+    if (!mainDB || modeOfPayment.empty()) return false;
+
+    std::string sql = "INSERT OR IGNORE INTO ModeOfPayment (name) VALUES (?);";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(mainDB, sql.c_str(), -1, &stmt, 0) != SQLITE_OK) {
+        return false;
+    }
+    sqlite3_bind_text(stmt, 1, modeOfPayment.c_str(), -1, SQLITE_STATIC);
+    bool success = sqlite3_step(stmt) == SQLITE_DONE;
+    sqlite3_finalize(stmt);
+    return success;
 }

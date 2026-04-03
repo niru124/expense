@@ -320,6 +320,7 @@ int main() {
           response[i]["spent_on"] = expenses[i].spent_on;
           response[i]["price"] = expenses[i].price;
           response[i]["category"] = expenses[i].category;
+          response[i]["mode_of_payment"] = expenses[i].mode_of_payment;
           response[i]["priority"] = expenses[i].priority;
         }
         return crow::response(response);
@@ -369,7 +370,23 @@ int main() {
           }
         }
 
-        if (!db_ptr->addExpense(spentOn, price, category)) {
+        std::optional<std::string> date = std::nullopt;
+        if (data.has("date")) {
+          date = refinedString(data["date"].s());
+          if (date->empty()) {
+            date = std::nullopt;
+          }
+        }
+
+        std::optional<std::string> modeOfPayment = std::nullopt;
+        if (data.has("modeOfPayment")) {
+          modeOfPayment = refinedString(data["modeOfPayment"].s());
+          if (modeOfPayment->empty()) {
+            modeOfPayment = std::nullopt;
+          }
+        }
+
+        if (!db_ptr->addExpense(spentOn, price, category, date, modeOfPayment)) {
           return crow::response(500, "Failed to add expense.");
         }
 
@@ -428,6 +445,7 @@ int main() {
           response[i]["spent_on"] = rangedExpenses[i].spent_on;
           response[i]["price"] = rangedExpenses[i].price;
           response[i]["category"] = rangedExpenses[i].category;
+          response[i]["mode_of_payment"] = rangedExpenses[i].mode_of_payment;
           response[i]["priority"] = rangedExpenses[i].priority;
         }
         return crow::response(response);
@@ -453,6 +471,7 @@ int main() {
           response[i]["spent_on"] = sortedExpenses[i].spent_on;
           response[i]["price"] = sortedExpenses[i].price;
           response[i]["category"] = sortedExpenses[i].category;
+          response[i]["mode_of_payment"] = sortedExpenses[i].mode_of_payment;
           response[i]["priority"] = sortedExpenses[i].priority;
         }
         return crow::response(response);
@@ -468,6 +487,7 @@ int main() {
           response[i]["spent_on"] = sortedExpenses[i].spent_on;
           response[i]["price"] = sortedExpenses[i].price;
           response[i]["category"] = sortedExpenses[i].category;
+          response[i]["mode_of_payment"] = sortedExpenses[i].mode_of_payment;
           response[i]["priority"] = sortedExpenses[i].priority;
         }
         return crow::response(response);
@@ -481,23 +501,47 @@ int main() {
   });
 
   CROW_ROUTE(app, "/categories").methods(crow::HTTPMethod::Get)([&db_ptr]() {
-    std::string monthYear = getCurrentMonthYearStr();
-    auto expenses = db_ptr->getExpensesForMonth(monthYear);
-    std::vector<std::string> categories;
-    for (const auto& expense : expenses) {
-      if (!expense.category.empty()) {
-        categories.push_back(expense.category);
-      }
-    }
-    // Remove duplicates
-    std::sort(categories.begin(), categories.end());
-    categories.erase(std::unique(categories.begin(), categories.end()), categories.end());
+    auto categories = db_ptr->getAllCategories();
     
     crow::json::wvalue response;
     for (size_t i = 0; i < categories.size(); ++i) {
       response[i] = categories[i];
     }
     return crow::response(response);
+  });
+
+  CROW_ROUTE(app, "/add_category").methods(crow::HTTPMethod::Post)([&db_ptr](const crow::request &req) {
+    auto data = crow::json::load(req.body);
+    if (!data || !data.has("category")) {
+      return crow::response(400, "Bad Request: Missing 'category'.");
+    }
+    std::string category = refinedString(data["category"].s());
+    if (db_ptr->addCategory(category)) {
+      return crow::response(200, "Category added successfully.");
+    }
+    return crow::response(500, "Failed to add category.");
+  });
+
+  CROW_ROUTE(app, "/mode_of_payment").methods(crow::HTTPMethod::Get)([&db_ptr]() {
+    auto modes = db_ptr->getAllModeOfPayment();
+    
+    crow::json::wvalue response;
+    for (size_t i = 0; i < modes.size(); ++i) {
+      response[i] = modes[i];
+    }
+    return crow::response(response);
+  });
+
+  CROW_ROUTE(app, "/add_mode_of_payment").methods(crow::HTTPMethod::Post)([&db_ptr](const crow::request &req) {
+    auto data = crow::json::load(req.body);
+    if (!data || !data.has("modeOfPayment")) {
+      return crow::response(400, "Bad Request: Missing 'modeOfPayment'.");
+    }
+    std::string modeOfPayment = refinedString(data["modeOfPayment"].s());
+    if (db_ptr->addModeOfPayment(modeOfPayment)) {
+      return crow::response(200, "Mode of payment added successfully.");
+    }
+    return crow::response(500, "Failed to add mode of payment.");
   });
 
   CROW_ROUTE(app, "/delete_expense/<int>").methods(crow::HTTPMethod::Delete)([&db_ptr](int id) {
@@ -531,6 +575,21 @@ int main() {
           price = data["price"].d();
         }
 
+        std::optional<std::string> category;
+        if (data.has("category")) {
+          category = refinedString(data["category"].s());
+        }
+
+        std::optional<std::string> modeOfPayment;
+        if (data.has("modeOfPayment")) {
+          modeOfPayment = refinedString(data["modeOfPayment"].s());
+        }
+
+        std::optional<std::string> date;
+        if (data.has("date")) {
+          date = refinedString(data["date"].s());
+        }
+
         std::optional<int> priority;
         if (data.has("priority")) {
           if (!isNumber(data["priority"].i())) {
@@ -539,11 +598,11 @@ int main() {
           priority = data["priority"].i();
         }
 
-        if (!spentOn && !price && !priority) {
+        if (!spentOn && !price && !category && !modeOfPayment && !date && !priority) {
           return crow::response(400, "Bad Request: No fields provided for update.");
         }
 
-        if (db_ptr->updateSelected2(id, spentOn, price, priority)) {
+        if (db_ptr->updateSelected3(id, spentOn, price, category, modeOfPayment, date, priority)) {
           return crow::response(200, "Expense with ID " + std::to_string(id) + " updated successfully.");
         } else {
           return crow::response(500, "Failed to update expense with ID " + std::to_string(id) + ".");

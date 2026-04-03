@@ -59,8 +59,14 @@
                 return;
             }
             
-            if (password.length < 3) {
-                errorMessage.textContent = 'Password must be at least 3 characters';
+            if (password.length < 6) {
+                errorMessage.textContent = 'Password must be at least 6 characters';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            
+            if (username.length < 3 || username.length > 32) {
+                errorMessage.textContent = 'Username must be between 3 and 32 characters';
                 errorMessage.classList.remove('hidden');
                 return;
             }
